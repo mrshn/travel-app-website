@@ -1,0 +1,38 @@
+{
+  "name": "travel-app-website",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Travels: a trip companion that tells you what to do right now, follows you on the map, and tracks what you planned, did and have left.",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@fontsource-variable/instrument-sans": "^5.3.0",
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@vite-pwa/nuxt": "^1.1.1",
+    "@vueuse/core": "^15.0.0",
+    "@vueuse/nuxt": "^15.0.0",
+    "idb-keyval": "^6.3.0",
+    "leaflet": "^1.9.4",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.43"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2",
+    "vue-tsc": "^3.3.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
