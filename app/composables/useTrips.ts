@@ -2,28 +2,44 @@ import { createGlobalState, useStorage } from '@vueuse/core'
 import type { Day, Scene, Stop, Trip } from '#shared/types/trip'
 import { datesBetween } from '#shared/utils/time'
 import { editableStops, slugify } from '#shared/utils/plan'
-import { romeTrip } from '~/data/rome'
+import { copyOfSeed, mergeSeed, planFingerprint } from '#shared/utils/seed'
+import { SEED_TRIPS } from '~/data/trips'
 
-/** Trips that ship with the app. Copied into your browser once; you can reset them later. */
-export const SEED_TRIPS: Trip[] = [romeTrip]
+export { SEED_TRIPS }
 
 const TRIPS_KEY = 'travel:trips:v1'
 const SEEDED_KEY = 'travel:seeded:v1'
 
-const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T
+const seedKey = (t: Trip) => t.seedId ?? t.id
 
 const useTripStore = createGlobalState(() => {
   const trips = useStorage<Trip[]>(TRIPS_KEY, [])
   const seeded = useStorage<string[]>(SEEDED_KEY, [])
-  for (const seed of SEED_TRIPS) {
-    const key = seed.seedId ?? seed.id
-    if (seeded.value.includes(key)) continue
-    if (!trips.value.some(t => t.id === seed.id)) trips.value.push(clone(seed))
-    seeded.value = [...seeded.value, key]
-  }
-  return { trips }
-})
+  /** Trips with a newer version waiting because you changed them here. */
+  const updates = ref<Record<string, Trip>>({})
 
+  for (const seed of SEED_TRIPS) {
+    const key = seedKey(seed)
+    const version = planFingerprint(seed)
+    const i = trips.value.findIndex(t => t.seedId === key || t.id === seed.id)
+    const local = trips.value[i]
+    if (!seeded.value.includes(key)) {
+      // A trip that's new to this device.
+      if (!local) trips.value.push(copyOfSeed(seed))
+      seeded.value = [...seeded.value, key]
+      continue
+    }
+    if (!local || local.seedVersion === version) continue // deleted here, or up to date
+    if (!local.seedVersion && planFingerprint(local) === version) {
+      local.seedVersion = version // saved before versions existed, and unchanged
+      continue
+    }
+    if (local.seedVersion && !local.edited) trips.value[i] = copyOfSeed(seed, local) // untouched: update quietly
+    else updates.value[local.id] = seed
+  }
+
+  return { trips, updates }
+})
 const ROMAN: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]
 export function toRoman(n: number): string {
   let out = ''
@@ -66,7 +82,7 @@ export interface NewTripInput {
 }
 
 export function useTrips() {
-  const { trips } = useTripStore()
+  const { trips, updates } = useTripStore()
 
   const sorted = computed(() => [...trips.value].sort((a, b) => a.start.localeCompare(b.start)))
 
@@ -76,6 +92,7 @@ export function useTrips() {
 
   function touch(t: Trip) {
     t.updatedAt = new Date().toISOString()
+    t.edited = true
   }
 
   function create(input: NewTripInput): Trip {
@@ -133,24 +150,50 @@ export function useTrips() {
 
   function seedOf(t: Trip | undefined): Trip | undefined {
     if (!t?.seedId) return undefined
-    return SEED_TRIPS.find(s => (s.seedId ?? s.id) === t.seedId)
+    return SEED_TRIPS.find(s => seedKey(s) === t.seedId)
   }
 
   /** Puts a seeded trip back to the original plan (what you did is kept). */
   function resetToSeed(id: string): boolean {
     const idx = trips.value.findIndex(t => t.id === id)
-    const seed = seedOf(trips.value[idx])
-    if (idx < 0 || !seed) return false
-    trips.value[idx] = { ...clone(seed), id, updatedAt: new Date().toISOString() }
+    const local = trips.value[idx]
+    const seed = seedOf(local)
+    if (!local || !seed) return false
+    trips.value[idx] = copyOfSeed(seed, local)
+    delete updates.value[id]
     return true
+  }
+
+  /** A newer version of this trip is waiting (it came from GitHub while you had changes here). */
+  function updateFor(id: string): Trip | undefined {
+    return updates.value[id]
+  }
+
+  /** Takes the newer version, keeping your own stops and packing items. */
+  function applyUpdate(id: string): boolean {
+    const idx = trips.value.findIndex(t => t.id === id)
+    const seed = updates.value[id]
+    const local = trips.value[idx]
+    if (!local || !seed) return false
+    trips.value[idx] = mergeSeed(local, seed)
+    delete updates.value[id]
+    return true
+  }
+
+  /** Keeps your version; the next newer version will be offered again. */
+  function skipUpdate(id: string) {
+    const seed = updates.value[id]
+    const t = get(id)
+    if (t && seed) t.seedVersion = planFingerprint(seed)
+    delete updates.value[id]
   }
 
   /** Brings back a seeded trip you deleted. */
   function restoreSeed(seedId: string): Trip | undefined {
-    const seed = SEED_TRIPS.find(s => (s.seedId ?? s.id) === seedId)
+    const seed = SEED_TRIPS.find(s => seedKey(s) === seedId)
     if (!seed) return undefined
     if (get(seed.id)) return get(seed.id)
-    const t = clone(seed)
+    const t = copyOfSeed(seed)
     trips.value.push(t)
     return t
   }
@@ -193,5 +236,5 @@ export function useTrips() {
     trips.value = next
   }
 
-  return { trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, restoreSeed, upsertStop, moveStop, removeStop, replaceAll }
+  return { trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, restoreSeed, updateFor, applyUpdate, skipUpdate, upsertStop, moveStop, removeStop, replaceAll }
 }

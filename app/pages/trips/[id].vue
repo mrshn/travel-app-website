@@ -14,7 +14,7 @@ const tabs = [
   { key: 'progress', label: 'Progress', icon: 'pie' },
   { key: 'more', label: 'More', icon: 'grid' },
 ]
-const MORE = ['more', 'bookings', 'packing', 'places', 'guide', 'sos', 'settings']
+const MORE = ['more', 'bookings', 'packing', 'places', 'guide', 'sos', 'settings', 'notes']
 const section = computed(() => String(route.path.split('/')[3] ?? 'now'))
 const activeTab = computed(() => (MORE.includes(section.value) ? 'more' : section.value))
 
@@ -27,6 +27,15 @@ const status = computed(() => {
   return 'Trip done'
 })
 const live = computed(() => v.moment.value?.phase === 'during')
+
+// A newer version of this trip arrived from GitHub while you had your own changes here.
+const pending = computed(() => (trip.value ? v.trips.updateFor(trip.value.id) : undefined))
+function takeUpdate() {
+  if (trip.value && v.trips.applyUpdate(trip.value.id)) toast('Plan updated. Your ticks, notes and own stops are kept.', { tone: 'ok' })
+}
+function keepMine() {
+  if (trip.value) v.trips.skipUpdate(trip.value.id)
+}
 
 useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` : 'Travels')) })
 </script>
@@ -64,6 +73,16 @@ useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` :
       </div>
     </header>
     <PreviewBar :timezone="trip.timezone" />
+    <div v-if="pending" class="updbar" role="status">
+      <AppIcon name="refresh" size="sm" />
+      <span class="grow"><b>This plan has a newer version</b> (saved from a chat). Your ticks, ratings, notes and own stops are kept; edits to the original stops are replaced.</span>
+      <button class="btn xs gold" type="button" @click="takeUpdate">
+        Update
+      </button>
+      <button class="btn xs plain" type="button" @click="keepMine">
+        Keep mine
+      </button>
+    </div>
 
     <NuxtPage />
 
@@ -116,6 +135,8 @@ useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` :
 .name { font-size: 18px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dates { font-size: 11.5px; color: var(--fg-3); font-weight: 600; letter-spacing: .02em; }
 .status { gap: 6px; }
+.updbar { max-width: var(--page-max); margin: 10px auto 0; width: calc(100% - 32px); display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--gold-soft); font-size: 13.5px; flex-wrap: wrap; }
+.updbar .i { color: var(--gold-ink); }
 .sosbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: var(--bad); color: #fff; font-weight: 700; font-size: 12.5px; text-decoration: none; letter-spacing: .04em; }
 .tabs-top { display: none; }
 

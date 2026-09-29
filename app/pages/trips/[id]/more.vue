@@ -4,6 +4,9 @@ import { directionsUrl } from '#shared/utils/geo'
 const v = useTripView()
 const trip = v.trip
 const s = v.summary
+const notesStore = useNotes()
+notesStore.load()
+const noteCount = computed(() => notesStore.notes.value.filter(n => n.trip === v.id.value).length)
 const tiles = computed(() => {
   const t = trip.value
   if (!t) return []
@@ -12,7 +15,8 @@ const tiles = computed(() => {
     { to: 'bookings', icon: 'ticket', title: 'Bookings', sub: sum ? `${sum.bookings.total - sum.bookings.done} to do · ${sum.bookings.done} done` : '', tone: 'var(--c-sight)' },
     { to: 'packing', icon: 'bag', title: 'Packing', sub: sum ? `${sum.packing.done} of ${sum.packing.total} packed` : '', tone: 'var(--gold)' },
     { to: 'places', icon: 'pin', title: 'Places', sub: `${t.places?.length ?? 0} sights, food & photo spots`, tone: 'var(--c-move)' },
-    { to: 'guide', icon: 'book', title: 'Guide', sub: `${t.info?.length ?? 0} sections: money, phone, safety…`, tone: 'var(--c-night)' },
+    { to: 'guide', icon: 'info', title: 'Guide', sub: `${t.info?.length ?? 0} sections: money, phone, safety…`, tone: 'var(--c-night)' },
+    { to: 'notes', icon: 'book', title: 'Notes & chats', sub: noteCount.value ? `${noteCount.value} saved from chats` : 'Research and chats saved from Claude', tone: 'var(--accent)' },
     { to: 'sos', icon: 'phone', title: 'SOS', sub: 'Emergency numbers & what to do', tone: 'var(--bad)' },
     { to: 'settings', icon: 'sliders', title: 'Trip settings', sub: 'Dates, home base, backup, reset', tone: 'var(--fg-2)' },
   ]

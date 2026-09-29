@@ -38,6 +38,8 @@ It ships with a full 5-day plan for **Rome, 8–12 October 2026** (first trip ab
 
 **All your trips** on one home screen, with progress bars for the plan and for your preparation.
 
+**Notes & chats**: research, tips and chat logs saved from conversations with Claude, readable in the app (home screen, `/notes`, and each trip's *More* tab). They're Markdown files in [`content/notes`](content/notes).
+
 <p>
   <img src="docs/screenshots/feedback.webp" width="240" alt="Rating, tags, note and spend for a stop">
   <img src="docs/screenshots/night.webp" width="240" alt="The Now screen at night in dark mode">
@@ -50,12 +52,21 @@ It ships with a full 5-day plan for **Rome, 8–12 October 2026** (first trip ab
 - It's an installable PWA: add it to your home screen and it opens full screen and works offline. Map areas you've viewed are cached for when you have no signal.
 - **Back up** from *Settings → Export everything* and import the file on another device. Photos stay on the device they were added on.
 
+## Saving chats and trips from Claude
+
+Everything the app shows lives in this repository, so a chat can add to it:
+
+- **Notes** go in `content/notes/YYYY-MM-DD-slug.md` with a small front matter (title, date, kind, trip, summary, tags).
+- **Trips** go in `app/data/<trip>.ts` and are listed in `app/data/trips.ts`.
+
+The formats and rules (stable stop ids, real coordinates, what never to publish) are in **[docs/content-guide.md](docs/content-guide.md)**. After a push to `main` the site redeploys in about two minutes. Phones pick up trip changes by themselves: a trip nobody changed updates quietly; one changed on the phone gets an *Update / Keep mine* banner that keeps the person's ticks, notes, photos and own stops.
+
 ## Develop
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # unit tests (time, geo, plan, guide, text)
+npm test           # unit tests (time, geo, plan, guide, notes, trip data)
 npm run typecheck
 npm run generate   # static site in .output/public
 ```
@@ -70,17 +81,21 @@ app/
                     trips/[id]/{now,plan,map,progress,more,bookings,packing,places,guide,sos,settings}
   components/       MapView (Leaflet), StopSheet, StopEditor, FeedbackEditor, DayStrip, …
   composables/      useTrips, useProgress, useTripView, useClock, useGeo, useLiveAlerts, usePhotos, …
-  data/rome.ts      the Rome plan (seed trip)
+  data/trips.ts     the trips that ship with the app (rome.ts is the Rome plan)
+  data/notes.ts     loads content/notes/*.md
   utils/            illustration engine, icons, map helpers, UI helpers
 shared/
   types/trip.ts     the data model
   utils/            time (trip clock, time zones), geo, plan (states, progress), guide (live guide), text
-tests/              Vitest
+tests/              Vitest (including checks of every trip's data)
+content/notes/      notes and chat logs (Markdown)
+public/archive/     standalone pages kept as they were
+docs/               content guide and screenshots
 ```
 
 ### Add a trip that ships with the app
 
-Create `app/data/<trip>.ts` exporting a `Trip` (see `shared/types/trip.ts`; `app/data/rome.ts` is a complete example) and add it to `SEED_TRIPS` in `app/composables/useTrips.ts`. Seeded trips are copied into the browser once and can be reset to the original from *Trip settings*.
+Create `app/data/<trip>.ts` exporting a `Trip` (see `shared/types/trip.ts`; `app/data/rome.ts` is a complete example) and add it to `SEED_TRIPS` in `app/data/trips.ts`. See [docs/content-guide.md](docs/content-guide.md). Seeded trips follow newer versions pushed here, and can be reset to the original from *Trip settings*.
 
 ## Deploy (GitHub Pages)
 

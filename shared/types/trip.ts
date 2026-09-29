@@ -256,6 +256,10 @@ export interface Trip {
   airport?: { name: string, lat: number, lng: number, label: string }
   /** Seeded trips can be reset to the original plan. */
   seedId?: string
+  /** Fingerprint of the seed this copy came from (to spot newer versions pushed to GitHub). */
+  seedVersion?: string
+  /** You changed the plan in the app (so a newer seed is offered, not applied silently). */
+  edited?: boolean
   createdAt: string
   updatedAt: string
 }

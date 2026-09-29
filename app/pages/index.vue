@@ -8,6 +8,10 @@ const store = useProgressStore()
 const { now } = useClock()
 const { choice } = useTheme()
 const { $pwa } = useNuxtApp()
+const notesStore = useNotes()
+notesStore.load()
+const latestNotes = computed(() => notesStore.notes.value.slice(0, 3))
+const tripTitle = (id?: string) => (id ? sorted.value.find(t => t.id === id)?.title : undefined)
 
 const cards = computed(() => sorted.value.map((trip) => {
   const p = { ...emptyProgress(), ...store.value[trip.id] }
@@ -68,6 +72,9 @@ useHead({ title: 'Travels' })
         <b class="display">Travels</b>
       </NuxtLink>
       <div class="row">
+        <NuxtLink to="/notes" class="btn icon plain round" aria-label="Notes and chats">
+          <AppIcon name="book" />
+        </NuxtLink>
         <button class="btn icon plain round" type="button" :aria-label="`Theme: ${choice}`" @click="cycleTheme">
           <AppIcon :name="themeIcon" />
         </button>
@@ -134,6 +141,18 @@ useHead({ title: 'Travels' })
       </div>
     </section>
 
+    <section v-if="latestNotes.length">
+      <div class="sec-h">
+        <h2>Notes & chats</h2>
+        <NuxtLink to="/notes" class="aside">
+          All {{ notesStore.notes.value.length }}
+        </NuxtLink>
+      </div>
+      <div class="notes">
+        <NoteCard v-for="n in latestNotes" :key="n.slug" :note="n" :trip-title="tripTitle(n.trip)" />
+      </div>
+    </section>
+
     <div v-if="!cards.length" class="card empty">
       <AppIcon name="globe" />
       <h3>No trips yet</h3>
@@ -172,6 +191,8 @@ useHead({ title: 'Travels' })
 .stats b { font-size: 21px; font-weight: 600; }
 .stats span { font-size: 11.5px; color: var(--fg-3); font-weight: 600; line-height: 1.2; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.notes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+@media (max-width: 480px) { .notes { grid-template-columns: minmax(0, 1fr); } }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 @media (max-width: 480px) {
   .stats b { font-size: 18px; }

@@ -26,6 +26,8 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: 'Your travel companion: follow the plan live on a map, tick off what you did, leave feedback and see what is left.' },
         { name: 'theme-color', content: '#8A1538' },
+        // A personal travel app: keep it out of search engines.
+        { name: 'robots', content: 'noindex, nofollow' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
       ],
@@ -55,7 +57,10 @@ export default defineNuxtConfig({
     },
     workbox: {
       navigateFallback: base,
+      // Standalone pages kept in public/archive open as themselves, not as the app.
+      navigateFallbackDenylist: [/\/archive\//],
       globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
+      globIgnores: ['**/archive/**'],
       runtimeCaching: [
         {
           urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
