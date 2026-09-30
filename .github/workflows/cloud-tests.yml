@@ -47,4 +47,13 @@ jobs:
           NUXT_PUBLIC_FIREBASE_EMULATORS: 127.0.0.1
 
       - name: Run the sync tests
-        run: npx -y firebase-tools@15 emulators:exec --only auth,firestore,storage --project travela-emre "node tests/e2e/cloud.e2e.mjs"
+        run: npx -y firebase-tools@15 emulators:exec --only auth,firestore,storage --project demo-travels "node tests/e2e/cloud.e2e.mjs"
+
+      - name: Show what the emulators said
+        if: failure()
+        run: |
+          for f in firebase-debug.log firestore-debug.log; do
+            [ -f "$f" ] || continue
+            msg=$(tail -n 60 "$f" | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')
+            echo "::error title=$f::$msg"
+          done

@@ -24,7 +24,8 @@ export type { User }
 
 /** `emulators`: a host running the Firebase emulators (tests only). */
 export function createFirebase(config: FirebaseConfig, emulators = '') {
-  const app = initializeApp(config)
+  // Emulators run as a "demo-" project, which needs no Google credentials at all.
+  const app = initializeApp(emulators ? { ...config, projectId: 'demo-travels', storageBucket: 'demo-travels.appspot.com' } : config)
   const auth = initializeAuth(app, {
     persistence: [indexedDBLocalPersistence, browserLocalPersistence],
     popupRedirectResolver: browserPopupRedirectResolver,

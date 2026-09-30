@@ -1,7 +1,7 @@
 // End-to-end check of sign-in and sync against the Firebase emulators, with two browsers
 // playing two devices. Run by .github/workflows/cloud-tests.yml:
 //   NUXT_PUBLIC_FIREBASE_EMULATORS=127.0.0.1 npm run generate
-//   npx firebase-tools emulators:exec --only auth,firestore,storage --project travela-emre "node tests/e2e/cloud.e2e.mjs"
+//   npx firebase-tools emulators:exec --only auth,firestore,storage --project demo-travels "node tests/e2e/cloud.e2e.mjs"
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
@@ -35,14 +35,25 @@ const server = createServer(async (req, res) => {
 
 const browser = await chromium.launch()
 const problems = []
+const logs = []
 let passed = 0
+
+// On GitHub, results also go out as annotations (readable from the API without the full log).
+const esc = s => String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+const escProp = s => esc(s).replace(/:/g, '%3A').replace(/,/g, '%2C')
+function annotate(level, title, msg) {
+  if (process.env.GITHUB_ACTIONS) console.log(`::${level} title=${escProp(title)}::${esc(msg)}`)
+}
 
 async function device(name) {
   const ctx = await browser.newContext({ timezoneId: 'Europe/Rome', serviceWorkers: 'block' })
   const page = await ctx.newPage()
   page.on('pageerror', e => problems.push(`[${name}] page error: ${e.message}`))
   page.on('console', (m) => {
-    if (m.text().includes('[cloud]')) console.log(`   [${name}] ${m.text()}`)
+    if (m.text().includes('[cloud]') || m.type() === 'error') {
+      logs.push(`[${name}] ${m.type()}: ${m.text()}`)
+      console.log(`   [${name}] ${m.text()}`)
+    }
   })
   await page.goto(BASE)
   await page.waitForFunction(() => !!window.__travelsTest)
@@ -70,18 +81,22 @@ async function step(title, fn) {
     await fn()
     passed++
     console.log(`✓ ${title} (${Date.now() - t} ms)`)
+    annotate('notice', `✓ ${title}`, `${Date.now() - t} ms`)
   }
   catch (e) {
     problems.push(`${title}: ${e.message.split('\n')[0]}`)
     console.log(`✗ ${title}\n   ${e.message.split('\n').slice(0, 3).join('\n   ')}`)
+    const state = await Promise.all([A, B].filter(Boolean).map(d => run(d, () => { const c = window.__travelsTest.cloud; return `${c.status.value} ${c.message.value}` }).then(x => `${d.name}: ${x}`, () => `${d.name}: ?`)))
+    annotate('error', `✗ ${title}`, `${e.message.split('\n').slice(0, 6).join('\n')}\n\nstatus: ${state.join(' | ')}\n\nlogs:\n${logs.slice(-25).join('\n')}`)
   }
 }
 
 const progressOf = (d, id = TRIP) => run(d, i => JSON.parse(JSON.stringify(window.__travelsTest.progress.value[i] ?? null)), id)
 const edit = (d, body) => run(d, `(() => { const T = window.__travelsTest; const P = (T.progress.value['${TRIP}'] ??= { stops: {}, feedback: {}, choices: {}, bookings: {}, packing: {}, dayNotes: {} }); ${body} })()`)
 
-const A = await device('A')
-const B = await device('B')
+let A, B
+A = await device('A')
+B = await device('B')
 let ownerUid = ''
 
 await step('A signs in and becomes the owner', async () => {
