@@ -5,9 +5,9 @@ Everything the app shows comes from this repository. There are two kinds of cont
 | What | Where | Shows up as |
 |---|---|---|
 | **Notes**: research, tips, chat logs, links to pages | `content/notes/*.md` | *Notes & chats* (home screen, `/notes`, and each trip's **More → Notes & chats**) |
-| **Trips**: a full plan with days, stops, bookings… | `app/data/<trip>.ts`, listed in `app/data/trips.ts` | A trip on the home screen with Now, Plan, Map, Progress |
+| **Trips**: a full plan with days, stops, bookings… | `app/data/<trip>.ts`, listed in `app/data/trips.ts` | A trip on the home screen, with the tabs Now, Plan, Places, Costs and More |
 
-Pushing to `main` rebuilds the site (GitHub Actions → Pages) in about two minutes: https://mrshn.github.io/travel-app-website/
+Pushing to `main` rebuilds the site (GitHub Actions → Firebase Hosting, plus a copy on Pages) in about two minutes: https://travela-emre.firebaseapp.com
 
 > **The repository is public.** Never save birth dates, passport or ID numbers, visa numbers, booking references, card details, personal phone numbers or emails, or a home address. Businesses' public contacts are fine. Ask before saving anything that feels private.
 
@@ -54,7 +54,8 @@ The data model is in `shared/types/trip.ts`; `app/data/rome.ts` is a complete ex
 ### Rules that matter
 
 - **`id` and `seedId`**: the same string, `<destination>-<yyyy>-<mm>`, e.g. `lisbon-2026-11`. Never change them after publishing.
-- **Stop ids never change once published.** Ticks, ratings, notes and photos on people's phones are stored by stop id. When updating a trip keep every existing id; give new stops new ids (a slug of the title, unique within the trip). An option stop keeps its id when its choices change; choice ids should stay stable too.
+- **Stop ids never change once published.** Ticks, ratings, notes, photos and costs on people's phones are stored by stop id. When updating a trip keep every existing id; give new stops new ids (a slug of the title, unique within the trip). An option stop keeps its id when its choices change; choice ids should stay stable too.
+- **Place ids never change once published either**: stamps are stored by place id (`sight-pantheon`, `food-armando-al-pantheon`, `photo-pantheon`).
 - **Times** are minutes after midnight of the day's date: 09:30 → `570`. After midnight add 1440: 01:30 the same night → `1530`. `timeLabel` is the text shown ("09:30", "~23:40", "Before 18:45").
 - **`timezone`** is an IANA name (`Europe/Lisbon`). Days are consecutive dates from `start` to `end`.
 - **Coordinates must be real.** Look them up; don't guess. `place: { name, lat, lng, query }` where `query` is a Google Maps search string ("Pantheon, Rome").
@@ -77,6 +78,38 @@ Icon names for `icon` fields: `sun sunset sunrise moon metro train bus taxi walk
 ### Optional sections
 
 `bookings` (with `due` dates and `asap`), `bookingTips`, `packing` (strings), `places` (sights/food/photo spots, with `open` per `openDays`), `dishes`, `info` (guide sections made of blocks: `p`, `list`, `table`, `callout`, `tags`, `special`), `sos`, `sosSteps`, `driverCard`, `phrases` (`[local, say it like, meaning]`), `budget` (per day: sights, food, night, transport), `overlay.lines` (metro lines with stations), `fx` (`{ homeCurrency, rate, source }`), `nightCards`, `airport`.
+
+### Places, stamps and costs
+
+The **Places** tab is a collection: each place is a card in a *set*, stamped once visited, and the rank and
+badges on the Badges page count those stamps. Costs are logged on the **Costs** tab. Most of this works from the
+data a trip already has; two optional fields cover what the automatic matching misses.
+
+- **`places`**: `category` is `sight`, `food` or `photo`. `top: true` makes a top pick (gold rim, the *Top picks*
+  badge). `verdict: 'trap'` or `'closed'` leaves a place out of the collection: shown dimmed, never stamped.
+  A photo spot's `bestTime` should start with a clock time ("06:35–07:15") when there is one.
+- **`set`** (optional, on a place): which set it belongs to. Without it the app works it out: sights and food from
+  their `scene`, sights named catacomb, necropolis, scavi or underground go underground, and photo spots by the
+  first time in `bestTime` (before 12:00 morning, from 12:00 golden hour, no time any time). A set of another
+  category than the place's is ignored.
+
+  | Category | Sets |
+  |---|---|
+  | sight | `ancient` Ancient sites, `art` Museums & art, `church` Churches, `underground` Underground, `views` Piazzas & views, `sight-other` Sights |
+  | food | `pasta` Trattorias & pasta, `street` Pizza & street food, `sweet` Coffee & sweets, `food-other` Food |
+  | photo | `morning` Morning light, `golden` Golden hour, `anytime` Any time |
+
+- **Stamps from the plan**: ticking a stop done stamps the places it is. A stop is a place when its title holds
+  the place's name as whole words (names of 5 letters or more) and the kinds fit: a sight stop for a sight, a food
+  stop for a food place, a sight stop with the `photo` icon for a photo spot. Never by distance.
+- **`placeId`** (optional, on a stop or on an option's choice): the id of the place it is, for stops the name match
+  misses or gets wrong (a terrace, a viewpoint, a restaurant with a different name). It must be the id of a place of
+  the same trip. Stops added in the app from a place get it by themselves.
+- **Costs**: a stop's `cost` text drives the quick logging. One euro amount ("€7") offers **Log €7** when the stop is
+  ticked and nothing is logged for it yet; a range or several amounts ("~€10–15", "€25 online (€20 door)") offer
+  **Add cost**, with the amounts to pick from; "Free" or no amount offers nothing. A booking's `cost` with one euro
+  amount offers **Log** when it is ticked. `budget` (per day: sights, food, night, transport) is the plan the Costs
+  page measures against, and `fx` adds the ≈ amount in the home currency.
 
 ### Adding or updating a trip
 
@@ -103,4 +136,4 @@ npm run generate    # must build
 git add -A && git commit -m "…" && git push origin main
 ```
 
-Then watch the run: `https://api.github.com/repos/mrshn/travel-app-website/actions/runs?per_page=1` (status `completed`, conclusion `success`), and open https://mrshn.github.io/travel-app-website/notes or the trip.
+Then watch the run: `https://api.github.com/repos/mrshn/travel-app-website/actions/runs?per_page=1` (status `completed`, conclusion `success`), and open https://travela-emre.firebaseapp.com/notes or the trip.

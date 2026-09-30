@@ -73,16 +73,7 @@ async function copyAddress() {
       </div>
     </section>
 
-    <Teleport to="body">
-      <div v-if="driver && trip.driverCard" class="driver" role="dialog" aria-modal="true" aria-label="Card for the taxi driver" @click="driver = false">
-        <div class="dc">
-          <p v-for="(l, i) in trip.driverCard" :key="i" :class="{ first: i === 0 }">
-            {{ l }}
-          </p>
-        </div>
-        <span class="small tap">Tap anywhere to close</span>
-      </div>
-    </Teleport>
+    <DriverCard v-model:open="driver" :lines="trip.driverCard" />
   </div>
 </template>
 
@@ -102,9 +93,4 @@ async function copyAddress() {
 .steps { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .home { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
 .hi { color: var(--accent); }
-.driver { position: fixed; inset: 0; z-index: 5000; background: #fff; color: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 20px; }
-.dc { text-align: center; }
-.dc p { font-size: clamp(26px, 7vw, 44px); font-weight: 700; line-height: 1.25; }
-.dc p.first { font-size: clamp(18px, 4.5vw, 26px); font-weight: 600; color: #555; margin-bottom: 10px; }
-.tap { color: #777; }
 </style>

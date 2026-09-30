@@ -62,17 +62,24 @@ export function routeLines(stops: ResolvedStop[], trip: Trip, states?: Record<st
   return out
 }
 
-/** Saved places (sights, food, photo spots) as small pins. */
-export function placeMarkers(trip: Trip, skip: Set<string> = new Set()): MapMarker[] {
+/**
+ * Saved places (sights, food, photo spots) as small pins. `stamped` (the trip view's stamps, or any set of
+ * place ids) marks the places you have stamped: their pins get a gold ring.
+ */
+export function placeMarkers(trip: Trip, skip: Set<string> = new Set(), stamped?: { has(placeId: string): boolean }): MapMarker[] {
   return (trip.places ?? [])
     .filter(p => p.place && !skip.has(p.id))
-    .map(p => ({
-      id: `place:${p.id}`,
-      lat: p.place!.lat,
-      lng: p.place!.lng,
-      title: p.name,
-      kind: p.category === 'photo' ? 'night' : p.category,
-      state: 'place',
-      icon: p.category === 'photo' ? 'camera' : p.category === 'food' ? 'food' : 'landmark',
-    }))
+    .map((p) => {
+      const mk: MapMarker = {
+        id: `place:${p.id}`,
+        lat: p.place!.lat,
+        lng: p.place!.lng,
+        title: p.name,
+        kind: p.category === 'photo' ? 'night' : p.category,
+        state: 'place',
+        icon: p.category === 'photo' ? 'camera' : p.category === 'food' ? 'food' : 'landmark',
+      }
+      if (stamped?.has(p.id)) mk.got = true
+      return mk
+    })
 }

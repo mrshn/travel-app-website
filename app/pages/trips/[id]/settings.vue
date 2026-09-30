@@ -4,6 +4,9 @@ import type { TripFormValue } from '~/components/TripForm.vue'
 const v = useTripView()
 const trip = v.trip
 const seed = computed(() => v.trips.seedOf(trip.value))
+const cloud = useCloud()
+/** Signed in with the account this app belongs to: the data is in the cloud too. */
+const signedIn = computed(() => !!cloud.user.value && cloud.status.value !== 'not-owner')
 
 function save(f: TripFormValue) {
   const t = trip.value
@@ -44,7 +47,7 @@ function resetPlan() {
 }
 
 function clearProgress() {
-  if (!confirm('Clear everything you marked, rated and wrote for this trip? This can\'t be undone.')) return
+  if (!confirm('Clear everything you ticked, rated, wrote, logged and stamped for this trip? This can\'t be undone.')) return
   v.clear()
   toast('Progress cleared')
 }
@@ -88,7 +91,10 @@ function removeTrip() {
       <h2 class="h3">
         Your data
       </h2>
-      <p class="small muted">
+      <p v-if="signedIn" class="small muted">
+        Everything is kept on this device and in your Google account. Export a backup if you want a file of your own.
+      </p>
+      <p v-else class="small muted">
         Everything lives in this browser on this device. Export a backup to move it to another phone or keep it safe (photos stay on this device).
       </p>
       <div class="row wrap">

@@ -1,3 +1,13 @@
+<script lang="ts">
+/** The CARTO tiles of older versions (now only "API KEY REQUIRED" images) go from the phone's storage, once per visit. */
+let oldTilesDropped = false
+function dropOldTiles() {
+  if (oldTilesDropped || typeof window === 'undefined' || !('caches' in window)) return
+  oldTilesDropped = true
+  window.caches.delete('map-tiles').catch(() => {})
+}
+</script>
+
 <script setup lang="ts">
 import L from 'leaflet'
 import type { MetroLine } from '#shared/types/trip'
@@ -14,6 +24,8 @@ export interface MapMarker {
   /** Short text inside the pin (a number); otherwise an icon. */
   label?: string
   icon?: string
+  /** A place you stamped: the pin gets a gold ring. */
+  got?: boolean
 }
 
 export interface MapLine {
@@ -57,7 +69,7 @@ const gmaps = useGoogleMaps()
 const online = useOnline()
 let map: L.Map | null = null
 let tiles: L.TileLayer | null = null
-/** Which base map is showing: Google's tiles, or OpenStreetMap/CARTO (also the offline fallback). */
+/** Which base map is showing: Google's tiles, or OpenStreetMap (also the offline fallback). */
 const base = ref<'google' | 'osm'>('osm')
 let attr = ''
 let baseUrl = ''
@@ -73,8 +85,19 @@ let youCircle: L.Circle | null = null
 let ro: ResizeObserver | null = null
 let programmatic = false
 
-const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
-const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${dark.value ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`
+const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'
+/**
+ * OpenStreetMap's own tiles: the service worker keeps the ones you looked at for offline use (nuxt.config.ts).
+ * crossOrigin gives readable responses, so only real tiles (status 200) are cached. Dark mode dims them with a
+ * CSS filter (below), so both themes share one set of cached tiles.
+ */
+const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const osmLayer = () => L.tileLayer(OSM_URL, { crossOrigin: true, maxNativeZoom: 19, maxZoom: 20, detectRetina: false })
+
+/** Marks the map as showing OpenStreetMap, which the dark theme dims (Google's tiles have a dark style of their own). */
+function markBase(which: 'google' | 'osm') {
+  el.value?.classList.toggle('osm', which === 'osm')
+}
 
 function setAttribution(text: string) {
   const c = map?.attributionControl
@@ -92,7 +115,7 @@ async function setBase() {
   const token = gmaps.useGoogleTiles.value && online.value ? await gmaps.session(theme) : null
   if (!map || seq !== baseSeq) return
   const want = token ? 'google' : 'osm'
-  const url = token ? gmaps.tileUrl(token) : tileUrl()
+  const url = token ? gmaps.tileUrl(token) : OSM_URL
   if (tiles && baseUrl === url) return
   tiles?.remove()
   tileErrors = 0
@@ -110,10 +133,11 @@ async function setBase() {
     setAttribution('Google Maps')
   }
   else {
-    tiles = L.tileLayer(url, { subdomains: 'abcd', maxZoom: 20, detectRetina: false })
+    tiles = osmLayer()
     setAttribution(ATTR)
   }
   base.value = want
+  markBase(want)
   tiles.addTo(map).bringToBack()
   if (token) void updateCopyright()
 }
@@ -142,7 +166,7 @@ function pinIcon(m: MapMarker): L.DivIcon {
   const inner = m.label
     ? esc(m.label)
     : `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${iconSvg(m.state === 'done' ? 'check' : m.icon)}</svg>`
-  const cls = ['mk', m.kind ? `k-${m.kind}` : '', m.state ? `s-${m.state}` : '', isPlace ? 'place' : '', props.selected === m.id ? 'sel' : ''].join(' ')
+  const cls = ['mk', m.kind ? `k-${m.kind}` : '', m.state ? `s-${m.state}` : '', isPlace ? 'place' : '', m.got ? 'got' : '', props.selected === m.id ? 'sel' : ''].join(' ')
   return L.divIcon({
     className: 'mk-wrap',
     html: `<div class="${cls}"><span>${inner}</span></div>`,
@@ -156,7 +180,8 @@ function drawMarkers() {
   markerLayer.clearLayers()
   for (const m of props.markers) {
     const z = props.selected === m.id ? 1000 : m.state === 'now' || m.state === 'next' ? 500 : m.state === 'place' ? -200 : 0
-    const mk = L.marker([m.lat, m.lng], { icon: pinIcon(m), title: m.title, alt: m.title, keyboard: true, riseOnHover: true, zIndexOffset: z })
+    // While picking a spot (the stop editor), pins are only context: a tap on one drops the new pin there.
+    const mk = L.marker([m.lat, m.lng], { icon: pinIcon(m), title: m.title, alt: m.title, keyboard: !props.pick, interactive: !props.pick, riseOnHover: true, zIndexOffset: z })
     mk.on('click', () => emit('select', m.id))
     mk.addTo(markerLayer)
   }
@@ -165,6 +190,8 @@ function drawMarkers() {
       icon: L.divIcon({ className: 'mk-wrap', html: `<div class="mk-home" title="${esc(props.home.label ?? 'Home')}"><svg class="i" viewBox="0 0 24 24">${iconSvg('bed')}</svg></div>`, iconSize: [30, 30], iconAnchor: [15, 15] }),
       title: props.home.label ?? 'Home',
       zIndexOffset: -100,
+      keyboard: !props.pick,
+      interactive: !props.pick,
     }).addTo(markerLayer)
   }
 }
@@ -256,11 +283,13 @@ onMounted(() => {
   map = L.map(el.value, { zoomControl: false, attributionControl: true, tapHold: false } as L.MapOptions)
   map.attributionControl.setPrefix(false)
   if (props.zoomControl) L.control.zoom({ position: 'bottomright' }).addTo(map)
+  dropOldTiles()
   // Start on the saved OpenStreetMap tiles unless Google's map is about to take over.
   if (!(gmaps.useGoogleTiles.value && online.value)) {
-    baseUrl = tileUrl()
-    tiles = L.tileLayer(baseUrl, { subdomains: 'abcd', maxZoom: 20, detectRetina: false }).addTo(map)
+    baseUrl = OSM_URL
+    tiles = osmLayer().addTo(map)
     setAttribution(ATTR)
+    markBase('osm')
   }
   void setBase()
   map.on('moveend', () => {
@@ -334,4 +363,16 @@ defineExpose({
 <style>
 .mk-wrap { background: none; border: 0; }
 .mapview.picking .leaflet-grab { cursor: crosshair; }
+/* A place you stamped: a gold ring around its pin. */
+.mk.got { box-shadow: 0 0 0 2.5px var(--gold-rim), 0 2px 8px rgba(0, 0, 0, .35); }
+/* Pins are 24 to 30 px: on touch screens each gets a 44 px tap area. Only pins you can press (Leaflet gives them
+   role="button"): the dot that shows where you are stays small, so it never covers a pin next to you. */
+@media (pointer: coarse) {
+  .leaflet-marker-icon.mk-wrap[role="button"]::after { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+}
+/* Dark mode dims OpenStreetMap's light tiles into a night map (Google's tiles bring their own dark style). */
+:root[data-theme="dark"] .mapview.osm .leaflet-tile-pane { filter: invert(.92) hue-rotate(180deg) saturate(.55) brightness(.9) contrast(.92); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mapview.osm .leaflet-tile-pane { filter: invert(.92) hue-rotate(180deg) saturate(.55) brightness(.9) contrast(.92); }
+}
 </style>

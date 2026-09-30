@@ -87,8 +87,7 @@ const nx = (m: number) => ((m - X0) / SPAN) * 100
     </div>
     <p class="small muted">
       About <b class="num">{{ cur(budgetTotal) }}</b> for the whole trip, before the hostel<template v-if="trip?.fx">
-        (≈ {{ money(budgetTotal * trip.fx.rate, trip.fx.homeCurrency) }})
-      </template>.
+        (≈ {{ money(budgetTotal * trip.fx.rate, trip.fx.homeCurrency) }})</template>.
     </p>
   </div>
 
@@ -122,17 +121,18 @@ const nx = (m: number) => ((m - X0) / SPAN) * 100
   </div>
 
   <!-- Night timeline -->
+  <!-- On phones each row puts its name and times above a full-width bar, so nothing is cut short. -->
   <div v-else-if="kind === 'nightChart'" class="card pad night" role="img" aria-label="A Roman night: aperitivo 19:00–21:00, dinner until about 23:00, bars busiest midnight to 02:00, clubs busiest 01:30–03:30">
     <div v-for="r in NIGHT" :key="r[0]" class="nrow">
-      <span class="nl small">{{ r[0] }}</span>
+      <span class="nl small"><span>{{ r[0] }}</span><span class="nt num">{{ fmtClock(r[1]) }}–{{ fmtClock(r[2]) }}</span></span>
       <span class="ntrack">
-        <span class="nbar num" :style="{ left: `${nx(r[1])}%`, width: `${nx(r[2]) - nx(r[1])}%` }">{{ fmtClock(r[1]) }}–{{ fmtClock(r[2]) }}</span>
+        <span class="nbar num" :style="{ left: `${nx(r[1])}%`, width: `${nx(r[2]) - nx(r[1])}%` }"><span class="nbt">{{ fmtClock(r[1]) }}–{{ fmtClock(r[2]) }}</span></span>
       </span>
     </div>
     <div class="nrow axis">
       <span class="nl" />
       <span class="ntrack">
-        <span v-for="h in [18, 20, 22, 24, 26, 28]" :key="h" class="tick num" :style="{ left: `${nx(h * 60)}%` }">{{ fmtClock(h * 60) }}</span>
+        <span v-for="(h, i) in [18, 20, 22, 24, 26, 28]" :key="h" class="axis-tick num" :class="{ thin: i % 2 === 0 }" :style="{ left: `${nx(h * 60)}%` }">{{ fmtClock(h * 60) }}</span>
       </span>
     </div>
   </div>
@@ -162,8 +162,22 @@ const nx = (m: number) => ((m - X0) / SPAN) * 100
 .night { display: flex; flex-direction: column; gap: 8px; }
 .nrow { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: center; }
 .nl { text-align: right; color: var(--fg-2); }
+.nt { display: none; }
 .ntrack { position: relative; height: 26px; background: repeating-linear-gradient(90deg, var(--surface-2) 0 1px, transparent 1px calc(100% / 11)); border-radius: 6px; }
 .nbar { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: var(--c-night); color: #fff; font-size: 11.5px; display: flex; align-items: center; padding: 0 6px; white-space: nowrap; overflow: hidden; }
 .axis .ntrack { background: none; height: 16px; }
-.tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--fg-3); }
+.axis-tick { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--fg-3); white-space: nowrap; }
+@media (max-width: 599px) {
+  /* Every four hours (20:00, 00:00, 04:00), so the labels never run together. */
+  .axis-tick.thin { display: none; }
+  .night { gap: 10px; }
+  .nrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .nl { display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+  .nt { display: inline; color: var(--fg-2); font-size: 12px; }
+  .nbt { display: none; }
+  .ntrack { height: 14px; }
+  .nbar { border-radius: 4px; }
+  .axis { margin-top: -2px; }
+  .axis .nl { display: none; }
+}
 </style>

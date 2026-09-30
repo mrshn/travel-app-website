@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { useStorage, watchDebounced } from '@vueuse/core'
-import { dayTally } from '#shared/utils/plan'
+import { useDebounceFn, useStorage } from '@vueuse/core'
+import { dayTally, type ResolvedStop } from '#shared/utils/plan'
 import { fmtClock } from '#shared/utils/time'
 
 const v = useTripView()
 const route = useRoute()
 const router = useRouter()
 const sheet = useQueryState('stop')
-const editor = useQueryState('edit')
+const actions = useTripActions()
+const costSheet = useCostSheet()
 const trip = v.trip
 
 const dayId = computed({
@@ -29,32 +30,114 @@ const minorCount = computed(() => plan.value?.stops.filter(s => s.minor).length 
 const markers = computed(() => (plan.value ? stopMarkers(plan.value.stops, plan.value.states) : []))
 const lines = computed(() => (plan.value && trip.value ? routeLines(plan.value.stops, trip.value, plan.value.states) : []))
 
-function toggle(id: string) {
-  const st = plan.value?.states[id]
-  v.mark(id, st === 'done' ? null : 'done')
+/** A tick on the timeline: through markStop(), so it toasts with Undo like every other tick. */
+function toggle(s: ResolvedStop) {
+  actions.markStop(s, plan.value?.states[s.id] === 'done' ? null : 'done')
 }
 
 function addStop() {
   router.push({ query: { ...route.query, edit: 'new', day: dayId.value } })
 }
 
-// Day journal
-const note = ref('')
-const extra = ref<number | null>(null)
-watch(() => day.value?.id, () => {
-  const n = day.value ? v.progress.value.dayNotes[day.value.id] : undefined
-  note.value = n?.note ?? ''
-  extra.value = n?.extraSpent ?? null
-}, { immediate: true })
-watchDebounced(note, (t) => {
-  if (day.value && (v.progress.value.dayNotes[day.value.id]?.note ?? '') !== t) v.setDayNote(day.value.id, { note: t })
-}, { debounce: 450 })
-function saveExtra() {
-  if (day.value) v.setDayNote(day.value.id, { extraSpent: extra.value && extra.value > 0 ? extra.value : undefined })
+// ---------- the Colosseum question ----------
+/** Folded to one row once you picked a day, or once the trip has started; "Change" opens it again. */
+const variantOpen = ref(false)
+const variantLabel = computed(() => trip.value?.variant?.options.find(o => o.id === v.variant.value)?.label ?? '')
+const variantFolded = computed(() =>
+  !!trip.value?.variant && !variantOpen.value && (!!v.progress.value.variant || v.moment.value?.phase !== 'before'),
+)
+const variantBox = ref<HTMLElement | null>(null)
+const changeBtn = ref<HTMLButtonElement | null>(null)
+async function openVariant() {
+  variantOpen.value = true
+  await nextTick()
+  variantBox.value?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus()
 }
+async function pickVariant(id: string) {
+  const wasOpen = variantOpen.value
+  v.setVariant(id)
+  variantOpen.value = false
+  if (!wasOpen) return
+  await nextTick()
+  changeBtn.value?.focus()
+}
+
+// ---------- the day's facts and alerts ----------
+/**
+ * The day's facts, and each of its sun times that the facts don't already give (Monday has a sunrise fact but
+ * no sunset): one chip row on phones, a list on wider screens.
+ */
+const facts = computed(() => {
+  const d = day.value
+  if (!d) return []
+  const out = (d.facts ?? []).map(f => ({ icon: f.icon, text: f.text }))
+  const told = (re: RegExp) => out.some(f => re.test(f.text))
+  if (d.sun) {
+    const sun: { icon: string, text: string }[] = []
+    if (!told(/\bsunrise\b/i)) sun.push({ icon: 'sunrise', text: `Sunrise ${fmtClock(d.sun.rise)}` })
+    if (!told(/\bsunset\b/i)) sun.push({ icon: 'sunset', text: `Sunset ${fmtClock(d.sun.set)}` })
+    if (d.sun.bluePm && !told(/\bblue hour\b/i)) sun.push({ icon: 'camera', text: `Blue hour ${fmtClock(d.sun.bluePm[0])}` })
+    out.push(...sun)
+  }
+  return out
+})
+const alertsOpen = ref(false)
+const alerts = computed(() => {
+  const all = day.value?.alerts ?? []
+  return alertsOpen.value ? all : all.slice(0, 1)
+})
+const moreAlerts = computed(() => Math.max(0, (day.value?.alerts?.length ?? 0) - 1))
+const alertsId = useId()
+
+// ---------- your day: rating, journal, money ----------
 const dayRating = computed({
   get: () => (day.value ? v.progress.value.dayNotes[day.value.id]?.rating : undefined),
   set: (r?: number) => day.value && v.setDayNote(day.value.id, { rating: r }),
+})
+
+/**
+ * The day journal. The text in the box belongs to `noteDay`; what you type is saved to that day shortly after
+ * you stop, and at once when you switch day or leave the page, so nothing lands on the wrong day or gets lost.
+ * Only typing is saved: a box you didn't touch never writes its copy back over a newer note (from another tab,
+ * or another phone through the cloud), and it shows that newer note instead.
+ */
+const note = ref('')
+const noteDay = ref('')
+let noteTyped = false
+function saveNote() {
+  const id = noteDay.value
+  if (!id || !noteTyped) return
+  noteTyped = false
+  if ((v.progress.value.dayNotes[id]?.note ?? '') !== note.value) v.setDayNote(id, { note: note.value })
+}
+const saveNoteSoon = useDebounceFn(saveNote, 450)
+function typedNote() {
+  noteTyped = true
+  saveNoteSoon()
+}
+watch(() => day.value?.id, (id) => {
+  saveNote()
+  noteDay.value = id ?? ''
+  note.value = id ? v.progress.value.dayNotes[id]?.note ?? '' : ''
+  noteTyped = false
+  alertsOpen.value = false
+}, { immediate: true })
+watch(() => (noteDay.value ? v.progress.value.dayNotes[noteDay.value]?.note ?? '' : ''), (saved) => {
+  if (!noteTyped) note.value = saved
+})
+onBeforeUnmount(saveNote)
+
+const dayMoney = computed(() => {
+  const t = trip.value
+  const d = day.value
+  const pair = d ? v.costs.value?.byDay[d.id] : undefined
+  if (!t || !d) return null
+  const spent = pair?.spent ?? 0
+  return {
+    spent: moneyExact(spent, t.currency),
+    planned: pair && pair.planned > 0 ? moneyExact(pair.planned, t.currency) : '',
+    home: spent > 0 ? moneyHome(spent, t) : '',
+  }
 })
 
 // Scroll to a stop when arriving with #stop-…
@@ -66,7 +149,16 @@ onMounted(() => {
 
 <template>
   <div v-if="trip" class="page plan">
-    <section v-if="trip.variant" class="card pad variant">
+    <section v-if="trip.variant && variantFolded" class="card variant-row" :aria-label="trip.variant.question">
+      <AppIcon name="ticket" size="sm" class="vr-ic" />
+      <p class="grow vr-q">
+        {{ trip.variant.question }} <span class="chip t-gold vr-chip">{{ variantLabel }}</span>
+      </p>
+      <button ref="changeBtn" class="btn xs ghost" type="button" :aria-label="`Change: ${trip.variant.question}`" @click="openVariant">
+        Change
+      </button>
+    </section>
+    <section v-else-if="trip.variant" ref="variantBox" class="card pad variant">
       <div class="row wrap between">
         <div class="stack tight grow">
           <span class="label">{{ trip.variant.question }}</span>
@@ -78,7 +170,7 @@ onMounted(() => {
             :key="o.id"
             type="button"
             :aria-pressed="v.variant.value === o.id"
-            @click="v.setVariant(o.id)"
+            @click="pickVariant(o.id)"
           >
             {{ o.label }}
           </button>
@@ -93,6 +185,7 @@ onMounted(() => {
         <div class="dh-pic art-frame">
           <SceneArt class="scene" :scene="plan.view.cover.scene" :tod="plan.view.cover.tod" :label="plan.view.title" :lazy="false" />
           <div class="scrim" />
+          <span v-if="tally && tally.total" class="chip on-art tnum dh-chip">{{ tally.done }}/{{ tally.total }} done</span>
           <div class="dh-in on-art">
             <p class="kicker k">
               {{ day.num }} · {{ fmtDate(day.date, 'long') }}
@@ -102,17 +195,12 @@ onMounted(() => {
             </h1>
           </div>
         </div>
-        <div class="dh-body">
-          <ul v-if="day.facts.length" class="facts">
-            <li v-for="(f, i) in day.facts" :key="i">
+        <div v-if="facts.length || tally" class="dh-body">
+          <ul v-if="facts.length" class="facts" tabindex="0" :aria-label="`About ${fmtDate(day.date, 'weekdayLong')}`">
+            <li v-for="(f, i) in facts" :key="i">
               <AppIcon :name="f.icon" size="sm" /><span>{{ f.text }}</span>
             </li>
           </ul>
-          <div v-if="day.sun && !day.facts.some(f => f.icon === 'sunset')" class="row wrap sun">
-            <span class="chip num"><AppIcon name="sunrise" />{{ fmtClock(day.sun.rise) }}</span>
-            <span class="chip num t-gold"><AppIcon name="sunset" />{{ fmtClock(day.sun.set) }}</span>
-            <span v-if="day.sun.bluePm" class="chip num"><AppIcon name="camera" />Blue hour {{ fmtClock(day.sun.bluePm[0]) }}</span>
-          </div>
           <div v-if="tally" class="dh-prog">
             <ProgressRing
               :size="64"
@@ -136,11 +224,14 @@ onMounted(() => {
       <div v-if="plan.view.banner" class="banner">
         <AppIcon name="info" size="sm" /><span>{{ plan.view.banner }}</span>
       </div>
-      <div v-if="day.alerts?.length" class="alerts">
-        <div v-for="(a, i) in day.alerts" :key="i" class="alert" :class="a.tone === 'warn' ? 'warn' : ''">
+      <div v-if="day.alerts?.length" :id="alertsId" class="alerts">
+        <div v-for="(a, i) in alerts" :key="i" class="alert" :class="a.tone === 'warn' ? 'warn' : ''">
           <AppIcon :name="a.icon" size="sm" />
           <span><b class="num">{{ fmtClock(a.from) }}</b> {{ a.text }}</span>
         </div>
+        <button v-if="moreAlerts" class="btn sm plain more-alerts" type="button" :aria-expanded="alertsOpen" :aria-controls="alertsId" @click="alertsOpen = !alertsOpen">
+          <AppIcon :name="alertsOpen ? 'chevu' : 'chev'" size="sm" />{{ alertsOpen ? 'Hide' : moreAlerts === 1 ? '1 more heads-up' : `${moreAlerts} more heads-ups` }}
+        </button>
       </div>
 
       <div class="cols">
@@ -162,7 +253,7 @@ onMounted(() => {
               :feedback="v.progress.value.feedback[s.id]"
               :last="i === stops.length - 1"
               @open="sheet.open(s.id)"
-              @toggle="toggle(s.id)"
+              @toggle="toggle(s)"
             />
           </ol>
           <div v-else class="card empty">
@@ -226,12 +317,24 @@ onMounted(() => {
             </div>
             <label class="field">
               <span>Day journal</span>
-              <textarea v-model="note" class="textarea" rows="3" placeholder="Best moment, people you met, what you'd change…" />
+              <textarea v-model="note" class="textarea" rows="3" placeholder="Best moment, people you met, what you'd change…" @input="typedNote" @blur="saveNote" />
             </label>
-            <label class="field">
-              <span>Other spending today <span class="hint">(not tied to a stop)</span></span>
-              <input v-model.number="extra" class="input num" type="number" inputmode="decimal" min="0" step="0.5" :placeholder="`0 ${trip.currency}`" @change="saveExtra">
-            </label>
+            <div v-if="dayMoney" class="spent">
+              <p class="tnum parts">
+                <span class="part">Spent this day: <b>{{ dayMoney.spent }}</b><template v-if="dayMoney.planned">
+                  of {{ dayMoney.planned }}
+                </template></span>
+                <span v-if="dayMoney.home" class="part"><span class="part-sep">&nbsp;·&nbsp;</span><span class="muted">{{ dayMoney.home }}</span></span>
+              </p>
+              <div class="row wrap spent-acts">
+                <button class="btn sm" type="button" @click="costSheet.open({ dayId: day.id })">
+                  <AppIcon name="plus" size="sm" />Add a cost
+                </button>
+                <NuxtLink class="btn sm plain" :to="`/trips/${trip.id}/costs`">
+                  See costs<AppIcon name="chevr" size="sm" />
+                </NuxtLink>
+              </div>
+            </div>
           </section>
         </aside>
       </div>
@@ -243,9 +346,19 @@ onMounted(() => {
 .plan { padding-top: 14px; }
 .variant { margin-bottom: 14px; }
 .variant .seg { flex: none; }
+/* The expanded question: 44 px day buttons (A1). */
+.variant .seg button { min-height: 44px; }
+.variant-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 6px 8px 6px 14px; min-height: 56px; }
+.vr-ic { color: var(--gold-ink); }
+.vr-q { font-size: 13.5px; font-weight: 650; color: var(--fg-2); line-height: 1.5; }
+.vr-chip { vertical-align: 1px; margin-left: 2px; }
+@media (max-width: 379px) {
+  .vr-ic { display: none; }
+}
 .dayhead { overflow: hidden; margin-top: 14px; }
 .dh-pic { height: 180px; display: flex; align-items: flex-end; }
 @media (min-width: 700px) { .dh-pic { height: 220px; } }
+.dh-chip { position: absolute; right: 12px; top: 12px; }
 .dh-in { padding: 16px 18px; }
 .dh-in .k { color: var(--on-art-2); }
 .dh-title { font-size: clamp(22px, 5vw, 30px); font-weight: 700; line-height: 1.15; text-shadow: 0 2px 14px rgba(0, 0, 0, .35); margin-top: 4px; }
@@ -253,11 +366,41 @@ onMounted(() => {
 .facts { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .facts li { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; }
 .facts .i { color: var(--gold-ink); margin-top: 2px; }
-.sun { gap: 6px; }
 .dh-prog { display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+@media (min-width: 700px) {
+  .dh-chip { display: none; }
+}
 @media (min-width: 900px) {
   .dh-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; column-gap: 24px; align-items: start; }
   .dh-prog { grid-column: 2; grid-row: 1 / span 2; border-top: 0; padding-top: 0; padding-left: 20px; border-left: 1px solid var(--line); align-self: stretch; }
+}
+/* Phones: a shorter picture with the done count on it, the facts as one row of chips that scrolls sideways, no ring. */
+@media (max-width: 699px) {
+  .dh-pic { height: 132px; }
+  /* The kicker sits higher on the shorter picture: a darker scrim behind it and full white (4.5:1 or more). */
+  .dh-pic .scrim { background: linear-gradient(180deg, rgba(6, 8, 20, 0) 0%, rgba(6, 8, 20, .5) 42%, rgba(6, 8, 20, .82) 100%); }
+  .dh-in .k { color: var(--on-art); text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+  .dh-in { padding: 12px 16px 14px; }
+  .dh-body { padding: 12px 0; }
+  .dh-body:not(:has(.facts)) { display: none; }
+  .facts {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding: 0 16px;
+    scroll-padding-inline: 16px;
+  }
+  .facts::-webkit-scrollbar { display: none; }
+  .facts li { flex: none; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .facts .i { margin-top: 0; width: 14px; height: 14px; }
+  .dh-prog { display: none; }
+}
+/* The narrowest phones wrap the title to two lines, which lifts the kicker further up the picture. */
+@media (max-width: 359px) {
+  .dh-pic .scrim { background: linear-gradient(180deg, rgba(6, 8, 20, .3) 0%, rgba(6, 8, 20, .62) 40%, rgba(6, 8, 20, .85) 100%); }
 }
 .banner, .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 14px; font-size: 14px; }
 .banner { margin-top: 12px; background: var(--accent-soft); color: var(--fg); }
@@ -266,6 +409,7 @@ onMounted(() => {
 .alert { background: var(--gold-soft); }
 .alert .i { color: var(--gold-ink); margin-top: 2px; }
 .alert.warn { background: var(--warn-soft); }
+.more-alerts { align-self: flex-start; color: var(--fg-2); }
 .cols { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 18px; }
 .main, .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 @media (min-width: 960px) {
@@ -275,7 +419,8 @@ onMounted(() => {
 .tl-h { padding: 0 2px; }
 .tl { padding: 6px 6px 6px 0; margin: 0; }
 .add { border-style: dashed; }
-.mapcard { position: relative; height: 280px; overflow: hidden; }
+/* Its own layer: the expand button (z-index 500) stays inside the card, under the header and the tab bar. */
+.mapcard { position: relative; height: 280px; overflow: hidden; isolation: isolate; }
 @media (min-width: 960px) { .mapcard { height: 340px; } }
 .expand { position: absolute; right: 10px; bottom: 10px; z-index: 500; background: var(--surface); box-shadow: var(--shadow); }
 .journey .jn { list-style: none; margin-top: 12px; display: flex; flex-direction: column; }
@@ -293,4 +438,10 @@ onMounted(() => {
 .infocard li .i { color: var(--gold-ink); margin-top: 2px; }
 .infocard h2 { gap: 8px; }
 .daynote { display: flex; flex-direction: column; gap: 12px; }
+.spent { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.spent-acts { gap: 8px; }
+/* Phrases joined by a dot that wrap as wholes; a phrase that starts a line drops its dot (clipped on the left). */
+.parts { display: flex; flex-wrap: wrap; margin-left: -.8em; clip-path: inset(-4px -4px -4px .8em); }
+.part { min-width: 0; padding-left: .8em; }
+.part-sep { display: inline-block; width: .8em; margin-left: -.8em; text-align: center; }
 </style>

@@ -2,13 +2,25 @@
 import type { InfoBlock } from '#shared/types/trip'
 
 defineProps<{ blocks: InfoBlock[] }>()
+
+/**
+ * A paragraph written as a Markdown heading ("### Clubs on your nights", one to four #) is shown as a heading
+ * in the app's heading style: h3 under the section (h4 for ####). Anything else is null.
+ */
+function heading(b: InfoBlock): { tag: 'h3' | 'h4', html: string } | null {
+  if (b.t !== 'p') return null
+  const m = /^(#{1,4}) +(\S.*)$/.exec(b.text.trim())
+  return m ? { tag: m[1]!.length === 4 ? 'h4' : 'h3', html: inlineMd(m[2]!.trim()) } : null
+}
 </script>
 
 <template>
   <div class="blocks">
     <template v-for="(b, i) in blocks" :key="i">
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <p v-if="b.t === 'p'" class="p" v-html="inlineMd(b.text)" />
+      <component :is="heading(b)!.tag" v-if="heading(b)" class="h3 bh" v-html="heading(b)!.html" />
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <p v-else-if="b.t === 'p'" class="p" v-html="inlineMd(b.text)" />
       <component :is="b.ordered ? 'ol' : 'ul'" v-else-if="b.t === 'list'" class="list">
         <!-- eslint-disable-next-line vue/no-v-html -->
         <li v-for="(it, j) in b.items" :key="j" v-html="inlineMd(it)" />
@@ -45,6 +57,8 @@ defineProps<{ blocks: InfoBlock[] }>()
 
 <style scoped>
 .blocks { display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 1.55; }
+/* A heading sits closer to what it introduces than to what comes before it. */
+.bh { margin-top: 8px; line-height: 1.3; }
 .list { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .list li::marker { color: var(--accent); }
 .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }

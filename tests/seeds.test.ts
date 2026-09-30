@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SEED_TRIPS } from '../app/data/trips'
+import { PLACE_SET_ORDER, placeSetCategory } from '../shared/utils/places'
 import { datesBetween } from '../shared/utils/time'
 import type { Stop, Trip } from '../shared/types/trip'
 
@@ -81,5 +82,25 @@ describe.each(SEED_TRIPS.map(t => [t.id, t] as const))('trip %s', (_id, t) => {
     expect(new Set(b).size).toBe(b.length)
     const p = (t.places ?? []).map(x => x.id)
     expect(new Set(p).size).toBe(p.length)
+  })
+
+  it('puts places only in known sets of their own category', () => {
+    for (const p of t.places ?? []) {
+      if (p.set === undefined) continue
+      expect(PLACE_SET_ORDER, `${p.id} set`).toContain(p.set)
+      expect(placeSetCategory(p.set), `${p.id}: ${p.set} is not a ${p.category} set`).toBe(p.category)
+    }
+  })
+
+  it('links stops and options only to places that exist', () => {
+    const ids = new Set((t.places ?? []).map(p => p.id))
+    for (const { where, stops } of allStopLists(t)) {
+      for (const s of stops) {
+        if (s.placeId !== undefined) expect(ids.has(s.placeId), `${where}/${s.id} placeId ${s.placeId}`).toBe(true)
+        for (const c of s.options?.choices ?? []) {
+          if (c.placeId !== undefined) expect(ids.has(c.placeId), `${where}/${s.id}/${c.id} placeId ${c.placeId}`).toBe(true)
+        }
+      }
+    }
   })
 })

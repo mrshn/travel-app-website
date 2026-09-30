@@ -40,6 +40,8 @@ export interface Choice {
   tod?: Tod
   bookingId?: string
   links?: LinkRef[]
+  /** This option is that saved place (PlaceCard.id): it stamps the place when done and puts it "in your plan". */
+  placeId?: string
 }
 
 export interface StopOptions {
@@ -79,6 +81,8 @@ export interface Stop {
   options?: StopOptions
   /** Added by you in the app. */
   custom?: boolean
+  /** This stop is that saved place (PlaceCard.id): it stamps the place when done and puts it "in your plan". */
+  placeId?: string
 }
 
 export interface DayAlert {
@@ -172,7 +176,15 @@ export interface PlaceCard {
   /** Text for Google Maps / Photos searches. */
   searchQuery?: string
   query?: string
+  /** The set it belongs to. Optional: worked out from the scene and best time when missing. */
+  set?: PlaceSet
 }
+
+/** Finer groups of places. Optional in trip data; worked out from the scene and best time when missing. */
+export type PlaceSet =
+  | 'ancient' | 'art' | 'church' | 'underground' | 'views' | 'sight-other'
+  | 'pasta' | 'street' | 'sweet' | 'food-other'
+  | 'morning' | 'golden' | 'anytime'
 
 export type InfoBlock =
   | { t: 'p', text: string }
@@ -278,6 +290,7 @@ export interface Feedback {
   rating?: number
   tags?: string[]
   note?: string
+  /** Logged here before costs had their own page. Read as a "Logged earlier" cost (costEntries); never written any more. */
   spent?: number
   photos?: string[]
   updatedAt: string
@@ -286,9 +299,53 @@ export interface Feedback {
 export interface DayNote {
   rating?: number
   note?: string
-  /** Money spent that day outside any stop (water, souvenirs, tickets…). */
+  /** Money spent that day outside any stop (water, souvenirs, tickets…), from before costs had their own page.
+   *  Read as a "Logged earlier" cost (costEntries); never written any more. */
   extraSpent?: number
   updatedAt?: string
+}
+
+/** What a cost was for. The first four line up with Trip.budget values [sights, food, night, transport]. */
+export type CostCat = 'food' | 'sights' | 'night' | 'transport' | 'stay' | 'other'
+
+/** One thing you paid for. Kept by id; never removed, only marked deleted. */
+export interface Expense {
+  id: string
+  /** More than 0, at most 99,999.99, rounded to cents, in `currency`. */
+  amount: number
+  /** The currency it was paid in (the trip's currency in this version). */
+  currency: string
+  cat: CostCat
+  /** The trip day it counts towards. Missing: before or after the trip. */
+  dayId?: string
+  /**
+   * With no dayId: whether it counts before or after the trip, as picked on the pad. Missing (older records):
+   * from when it was logged, after the trip's end or not.
+   */
+  when?: 'before' | 'after'
+  note?: string
+  stopId?: string
+  placeId?: string
+  bookingId?: string
+  /** Title of the linked stop or booking when it was logged, so it still reads well if that goes away. */
+  title?: string
+  /** Logged while previewing another moment of the trip. */
+  preview?: true
+  /** When it was logged (ISO, real clock). */
+  at: string
+  /** Last change (ISO). The newer copy wins when two devices merge. */
+  updatedAt: string
+  /** Deleted. Kept so a merge with an older copy can't bring it back. */
+  deleted?: true
+}
+
+/** A place you stamped yourself, or took a stamp back from. */
+export interface PlaceStamp {
+  /** true: stamped by hand. false: taken back (also hides a stamp a done stop would give).
+   *  null: no choice any more (a stamp you undid at once); a done stop can still stamp it. */
+  on: boolean | null
+  at: string
+  updatedAt: string
 }
 
 export interface TripProgress {
@@ -300,4 +357,8 @@ export interface TripProgress {
   variant?: string
   dayNotes: Record<string, DayNote>
   tripNote?: string
+  /** Costs by id, tombstones included (older saves lack it). Feedback.spent and DayNote.extraSpent are read, never written. */
+  expenses?: Record<string, Expense>
+  /** Stamps you gave or took back by hand, by place id (older saves lack it). Stamps from done stops are derived. */
+  stamps?: Record<string, PlaceStamp>
 }

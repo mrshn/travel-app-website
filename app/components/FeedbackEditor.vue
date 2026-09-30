@@ -4,13 +4,11 @@ import { watchDebounced } from '@vueuse/core'
 const props = defineProps<{ stopId: string, title?: string }>()
 const v = useTripView()
 const photos = usePhotos()
+const cloud = useCloud()
 
 const fb = computed(() => v.progress.value.feedback[props.stopId])
-const currency = computed(() => v.trip.value?.currency ?? 'EUR')
-const fx = computed(() => v.trip.value?.fx)
 
 const note = ref(fb.value?.note ?? '')
-const spent = ref<number | null>(fb.value?.spent ?? null)
 const busy = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -22,7 +20,6 @@ function flushNote(id: string) {
 watch(() => props.stopId, (_id, old) => {
   if (old) flushNote(old)
   note.value = fb.value?.note ?? ''
-  spent.value = fb.value?.spent ?? null
 })
 onBeforeUnmount(() => flushNote(props.stopId))
 
@@ -30,10 +27,14 @@ watchDebounced(note, (n) => {
   if ((fb.value?.note ?? '') !== n) v.setFeedback(props.stopId, { note: n })
 }, { debounce: 450 })
 
-function saveSpent() {
-  const n = spent.value === null || Number.isNaN(Number(spent.value)) ? undefined : Math.max(0, Number(spent.value))
-  v.setFeedback(props.stopId, { spent: n || undefined })
-}
+/**
+ * Where your photos are kept: backed up while signed in (unless the account can't take them), else only here.
+ * Signed in with a Google account that isn't the app's owner keeps nothing in the cloud (as Trip settings says).
+ */
+const photoLine = computed(() => {
+  if (!cloud.user.value) return 'Photos stay on this phone until you sign in.'
+  return cloud.status.value !== 'not-owner' && cloud.photoBackup.value === 'on' ? 'Photos are backed up to your account.' : 'Photos stay on this device.'
+})
 
 const rating = computed({
   get: () => fb.value?.rating,
@@ -80,7 +81,7 @@ const ratingWords = ['', 'Not for me', 'Meh', 'Good', 'Great', 'Unforgettable']
       <h3 class="h3">
         How was it?
       </h3>
-      <span v-if="fb?.updatedAt" class="tiny faint">Saved</span>
+      <span v-if="fb?.updatedAt" class="tiny muted">Saved</span>
     </div>
     <div class="rate">
       <StarRating v-model="rating" />
@@ -102,18 +103,6 @@ const ratingWords = ['', 'Not for me', 'Meh', 'Good', 'Great', 'Unforgettable']
       <span>Notes</span>
       <textarea v-model="note" class="textarea" rows="3" placeholder="What stood out? Who did you meet? A tip for next time…" />
     </label>
-    <div class="money">
-      <label class="field grow">
-        <span>Spent here</span>
-        <div class="cur">
-          <input v-model.number="spent" class="input num" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0" @change="saveSpent" @blur="saveSpent">
-          <span class="unit">{{ currency }}</span>
-        </div>
-      </label>
-      <p v-if="fx && spent" class="conv small muted num">
-        ≈ {{ money(spent * fx.rate, fx.homeCurrency) }}
-      </p>
-    </div>
     <div class="photos">
       <span class="label">Photos</span>
       <div class="pgrid">
@@ -124,8 +113,8 @@ const ratingWords = ['', 'Not for me', 'Meh', 'Good', 'Great', 'Unforgettable']
           <span>{{ busy ? 'Saving…' : 'Add' }}</span>
         </label>
       </div>
-      <p class="tiny faint">
-        Photos stay on this device.
+      <p class="tiny muted photo-line">
+        {{ photoLine }}
       </p>
     </div>
   </section>
@@ -136,12 +125,7 @@ const ratingWords = ['', 'Not for me', 'Meh', 'Good', 'Great', 'Unforgettable']
 .rate { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .word { font-weight: 650; color: var(--fg-2); }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.tags .chip { min-height: 32px; padding: 4px 12px; font-size: 13px; border-color: var(--line); background: var(--surface); }
-.money { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.cur { position: relative; max-width: 220px; }
-.cur .input { padding-right: 56px; }
-.unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 600 13px var(--font-data); color: var(--fg-3); }
-.conv { padding-bottom: 12px; }
+.tags .chip { min-height: 40px; padding: 4px 14px; font-size: 13.5px; border-color: var(--line); background: var(--surface); }
 .photos { display: flex; flex-direction: column; gap: 8px; }
 .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
 .add { aspect-ratio: 1; border-radius: 12px; border: 2px dashed var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--fg-2); font-size: 12.5px; font-weight: 600; cursor: pointer; background: var(--surface); }

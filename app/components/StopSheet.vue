@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { directionsUrl, fmtDistance, haversine, photosUrl, travelEstimate } from '#shared/utils/geo'
-import type { StopStatus } from '#shared/types/trip'
+import type { PlaceCard, StopStatus } from '#shared/types/trip'
+import { placeIsCollectable, placeLinksForStop, placeStampDate } from '#shared/utils/places'
 
 const v = useTripView()
+const route = useRoute()
+const router = useRouter()
+const actions = useTripActions()
+const costSheet = useCostSheet()
 const sheet = useQueryState('stop')
 const editor = useQueryState('edit')
 const geo = useGeo()
@@ -27,13 +32,43 @@ const fromYou = computed(() => {
 })
 const walkMode = computed(() => (fromYou.value?.est.mode === 'transit' ? 'transit' : 'walking'))
 
+/** Ticks through markStop, like every other tick: its toast names any stamp, offers Log and has Undo. */
 function setStatus(s: StopStatus | null) {
-  if (!stop.value) return
-  const id = stop.value.id
-  const before = v.statusOf(id) ?? null
-  v.mark(id, s)
-  if (s === 'done') toast('Marked as done', { tone: 'ok', action: { label: 'Undo', run: () => v.mark(id, before) } })
-  else if (s === 'skipped') toast('Skipped', { action: { label: 'Undo', run: () => v.mark(id, before) } })
+  if (stop.value) actions.markStop(stop.value, s)
+}
+
+// Costs here: what was logged for this stop, newest first.
+const currency = computed(() => v.trip.value?.currency ?? 'EUR')
+const hereEntries = computed(() => {
+  const id = stop.value?.id
+  return id ? (v.costs.value?.entries ?? []).filter(e => e.stopId === id) : []
+})
+const hereTotal = computed(() => (stop.value ? v.costs.value?.byStop[stop.value.id] ?? 0 : 0))
+function addCost() {
+  if (stop.value) costSheet.open({ stopId: stop.value.id, dayId: stop.value.dayId })
+}
+
+// Stamps: the places this stop is, stamped or waiting for the tick.
+const stampRows = computed(() => {
+  const s = stop.value
+  const t = v.trip.value
+  if (!s || !t) return []
+  const places = t.places ?? []
+  return placeLinksForStop(s, places)
+    .map(id => places.find(p => p.id === id))
+    .filter((p): p is PlaceCard => !!p && placeIsCollectable(p))
+    .map((p) => {
+      const info = v.stamps.value.get(p.id)
+      const date = info ? placeStampDate(t, info) : ''
+      return { place: p, stamped: !!info, date, when: date ? `Stamped · ${fmtDate(date, 'short')}` : 'Stamped' }
+    })
+})
+/** The place's sheet takes this one's place in the URL (no stacked sheets). */
+function openPlace(id: string) {
+  const query = { ...route.query }
+  delete query.stop
+  query.place = id
+  router.replace({ query })
 }
 
 function showOnMap() {
@@ -71,7 +106,7 @@ function edit() {
       </div>
 
       <div class="content">
-        <div class="seg block" role="group" aria-label="Status">
+        <div class="seg block status" role="group" aria-label="Status">
           <button type="button" :aria-pressed="state !== 'done' && state !== 'skipped'" @click="setStatus(null)">
             <AppIcon name="circle" size="sm" />{{ state === 'missed' ? 'Not marked' : 'Planned' }}
           </button>
@@ -84,7 +119,7 @@ function edit() {
         </div>
 
         <div class="row wrap facts">
-          <span class="chip" :style="{ color: KIND_META[stop.kind].color }"><AppIcon :name="stopIcon(stop)" />{{ KIND_META[stop.kind].label }}</span>
+          <span class="chip"><AppIcon :name="stopIcon(stop)" :style="{ color: KIND_META[stop.kind].color }" />{{ KIND_META[stop.kind].label }}</span>
           <span v-if="stop.cost" class="chip num"><AppIcon name="euro" />{{ stop.cost }}</span>
           <span v-if="stop.tags?.includes('must')" class="chip t-accent-soft">Must do</span>
           <span v-if="stop.tags?.includes('optional')" class="chip t-plain">Optional</span>
@@ -94,6 +129,47 @@ function edit() {
             <AppIcon :name="booked ? 'check' : 'ticket'" />{{ booked ? 'Booked' : 'Book this' }}
           </NuxtLink>
         </div>
+
+        <section class="here" aria-labelledby="stop-costs-h">
+          <div class="here-h">
+            <h3 id="stop-costs-h" class="h3">
+              Costs here
+            </h3>
+            <span v-if="hereTotal > 0" class="num strong">{{ moneyExact(hereTotal, currency) }}</span>
+          </div>
+          <div v-if="hereEntries.length" class="card flat rows here-rows">
+            <CostRow v-for="e in hereEntries.slice(0, 3)" :key="e.id" :entry="e" />
+          </div>
+          <p v-else class="small muted">
+            Nothing logged here yet.
+          </p>
+          <div class="row wrap here-acts">
+            <button class="btn sm" type="button" @click="addCost">
+              <AppIcon name="plus" size="sm" />Add a cost
+            </button>
+            <NuxtLink v-if="hereEntries.length > 3" :to="`/trips/${v.id.value}/costs`" class="btn sm plain">
+              See all {{ hereEntries.length }}
+            </NuxtLink>
+          </div>
+        </section>
+
+        <section v-if="stampRows.length" class="stamps" aria-label="Stamps">
+          <button v-for="r in stampRows" :key="r.place.id" type="button" class="st" @click="openPlace(r.place.id)">
+            <span class="st-mark" aria-hidden="true">
+              <StampMark v-if="r.stamped" :place="r.place" :date="r.date || undefined" :size="58" />
+              <span v-else class="st-empty"><AppIcon name="stamp" /></span>
+            </span>
+            <span class="st-t">
+              <template v-if="r.stamped">
+                <b class="st-name">{{ r.place.name }}</b>
+                <span class="small muted">{{ r.when }}</span>
+              </template>
+              <span v-else-if="state === 'done'" class="small">Stamp removed: <b>{{ r.place.name }}</b></span>
+              <span v-else class="small">Stamps when done: <b>{{ r.place.name }}</b></span>
+            </span>
+            <AppIcon name="chevr" size="sm" class="st-go" />
+          </button>
+        </section>
 
         <p v-if="stop.tip" class="tip">
           {{ stop.tip }}
@@ -161,11 +237,30 @@ function edit() {
 .hero { height: 220px; display: flex; align-items: flex-end; }
 @media (min-width: 900px) { .hero { height: 240px; } }
 .hero-in { padding: 16px 18px 16px; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.close { position: absolute; top: 14px; right: 14px; }
+/* Below the sheet's 30 px drag strip, so the whole 44 px touch area can be tapped. */
+.close { position: absolute; top: 34px; right: 14px; }
 .opt { font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--on-art-2); }
 .ttl { font-size: 23px; font-weight: 700; line-height: 1.2; text-shadow: 0 1px 12px rgba(0, 0, 0, .35); }
 .content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.status button { min-height: 44px; }
 .facts { gap: 6px; }
+/* The plain chips' shared grey is 4.1:1 on the sheet's background in light mode: one step darker for 4.5:1. */
+.facts .chip.t-plain { color: var(--fg-2); }
+.here { display: flex; flex-direction: column; gap: 8px; }
+.here-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.here-rows { overflow: hidden; background: var(--surface); }
+.here-acts { gap: 8px; }
+.stamps { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.st { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 14px 8px 10px; background: none; border: 0; text-align: left; color: var(--fg); }
+.st + .st { border-top: 1px solid var(--line); }
+@media (hover: hover) { .st:hover { background: var(--surface-2); } }
+.st:active { background: var(--surface-2); }
+.st:focus-visible { outline-offset: -3px; }
+.st-mark { flex: none; width: 58px; height: 58px; display: grid; place-items: center; }
+.st-empty { width: 50px; height: 50px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--fg-3); }
+.st-t { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; line-height: 1.35; }
+.st-name { font-weight: 650; }
+.st-go { color: var(--fg-3); flex: none; }
 .tip { font-size: 15.5px; line-height: 1.55; }
 .lines { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .where { padding: 14px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }

@@ -69,12 +69,15 @@ export default defineNuxtConfig({
       globIgnores: ['**/archive/**'],
       runtimeCaching: [
         {
-          urlPattern: /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*/i,
+          // OpenStreetMap tiles you looked at, so the map still shows them offline. Only tiles the map asked for
+          // are kept: no prefetching (the OSM tile policy). Status 200 only: an opaque response would hide errors
+          // and count about 7 MB against the phone's storage quota.
+          urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
           handler: 'CacheFirst',
           options: {
-            cacheName: 'map-tiles',
-            expiration: { maxEntries: 2500, maxAgeSeconds: 60 * 60 * 24 * 60 },
-            cacheableResponse: { statuses: [0, 200] },
+            cacheName: 'map-tiles-v2',
+            expiration: { maxEntries: 3000, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            cacheableResponse: { statuses: [200] },
           },
         },
       ],

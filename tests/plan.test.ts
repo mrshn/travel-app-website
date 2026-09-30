@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { romeTrip } from '../app/data/rome'
 import { activeVariant, dayViews, emptyProgress, findStop, planDays, resolveStop, resolveStops, stopStates, summarize } from '../shared/utils/plan'
 import { LEAVE_BUFFER, liveGuide } from '../shared/utils/guide'
+import { costSummary } from '../shared/utils/costs'
 import { tripMoment } from '../shared/utils/time'
-import type { Stop, Trip } from '../shared/types/trip'
+import type { Expense, Stop, Trip } from '../shared/types/trip'
 
 const trip = romeTrip as Trip
 const at = (iso: string) => tripMoment(trip, new Date(iso))
@@ -193,5 +194,53 @@ describe('live guide', () => {
     const { m, plan } = plans('2026-10-12T20:00:00Z')
     expect(liveGuide(plan.stops, plan.states, m.minutes).mode).toBe('done')
     expect(liveGuide([], {}, 600).mode).toBe('empty')
+  })
+})
+
+describe('money from the costs ledger', () => {
+  const m = at('2026-10-09T14:40:00Z') // Friday 16:40
+  const cost = (id: string, amount: number, more: Partial<Expense>): Expense =>
+    ({ id, amount, currency: 'EUR', cat: 'food', at: '2026-10-09T14:00:00.000Z', updatedAt: '2026-10-09T14:00:00.000Z', ...more })
+
+  it('starts empty progress with no costs and no stamps', () => {
+    expect(emptyProgress()).toEqual({ stops: {}, feedback: {}, choices: {}, bookings: {}, packing: {}, dayNotes: {}, expenses: {}, stamps: {} })
+  })
+
+  it('takes spent from the ledger, and spentAll from every cost', () => {
+    const p = emptyProgress()
+    p.feedback['vatican-museums-sistine-chapel'] = { rating: 5, spent: 25, updatedAt: '2026-10-09T10:00:00Z' }
+    p.dayNotes.thu = { extraSpent: 9 }
+    p.expenses = {
+      'c-1': cost('c-1', 3.5, { dayId: 'fri' }),
+      'c-2': cost('c-2', 35, { cat: 'stay' }), // before the trip
+      'c-3': cost('c-3', 14, { cat: 'stay', dayId: 'thu' }), // city tax: not part of the daily plan
+      'c-4': cost('c-4', 50, { dayId: 'fri', deleted: true }),
+    }
+    const plans = planDays(trip, p, m)
+    const costs = costSummary(trip, p, plans)
+    const s = summarize(trip, p, m, plans, costs)
+    expect(s.spent).toBe(37.5)
+    expect(s.spent).toBe(costs.trip.spent)
+    expect(s.spentAll).toBe(86.5)
+    expect(s.spentAll).toBe(costs.all)
+    expect(s.days.map(d => [d.id, d.spent])).toEqual([['thu', 9], ['fri', 28.5], ['sat', 0], ['sun', 0], ['mon', 0]])
+    // Without costs given, summarize() works them out the same way.
+    expect(summarize(trip, p, m)).toEqual(s)
+  })
+
+  it('keeps spent when the Colosseum day switches', () => {
+    const p = emptyProgress()
+    p.feedback.colosseum = { spent: 18, updatedAt: '2026-10-10T08:00:00Z' } // moves from Saturday to Sunday
+    p.feedback['bar-breakfast-cornetto-cappuccino-at-the-counter'] = { spent: 4.5, updatedAt: '2026-10-10T06:00:00Z' } // only in the Saturday version
+    p.expenses = { 'c-1': cost('c-1', 10, { dayId: 'sat' }) }
+    const before = summarize(trip, p, m)
+    p.variant = 'sun'
+    const after = summarize(trip, p, m)
+    expect(before.spent).toBe(32.5)
+    expect(after.spent).toBe(before.spent)
+    expect(after.spentAll).toBe(before.spentAll)
+    expect(before.days.find(d => d.id === 'sat')!.spent).toBe(32.5)
+    expect(after.days.find(d => d.id === 'sat')!.spent).toBe(14.5)
+    expect(after.days.find(d => d.id === 'sun')!.spent).toBe(18)
   })
 })

@@ -9,6 +9,8 @@ const route = useRoute()
 const router = useRouter()
 const geo = useGeo()
 const sheet = useQueryState('stop')
+const placeSheet = useQueryState('place')
+const actions = useTripActions()
 const trip = v.trip
 
 const dayId = computed({
@@ -25,6 +27,10 @@ const dayId = computed({
 })
 const showPlaces = useStorage('travel:map:places', false)
 const showMetro = useStorage('travel:map:metro', true)
+// ?places=1 (the Places page's Map link) turns the places layer on.
+watch(() => route.query.places, (p) => {
+  if (p === '1') showPlaces.value = true
+}, { immediate: true })
 const follow = ref(false)
 const selected = ref<string | null>(typeof route.query.focus === 'string' ? route.query.focus : null)
 const mapRef = ref<{ flyTo: (lat: number, lng: number, z?: number) => void, fit: () => void } | null>(null)
@@ -41,13 +47,13 @@ const markers = computed<MapMarker[]>(() => {
       for (const mk of stopMarkers(p.stops, p.states)) out.push({ ...mk, label: mk.state === 'done' ? undefined : String(i + 1) })
     })
   }
-  if (showPlaces.value) out = out.concat(placeMarkers(t))
+  if (showPlaces.value) out = out.concat(placeMarkers(t, undefined, v.stamps.value))
   return out
 })
 const lines = computed<MapLine[]>(() => (plan.value && trip.value ? routeLines(plan.value.stops, trip.value, plan.value.states) : []))
 const metro = computed(() => (showMetro.value ? trip.value?.overlay?.lines ?? [] : []))
 
-// Selection
+// Selection: a stop shows its card; a place (highlighted while its sheet is open) opens the place sheet.
 const selStop = computed(() => (selected.value && !selected.value.startsWith('place:') ? v.locate(selected.value) : null))
 const selPlace = computed(() => (selected.value?.startsWith('place:') ? trip.value?.places?.find(p => `place:${p.id}` === selected.value) : undefined))
 const selPoint = computed(() => selStop.value?.stop.place ?? selPlace.value?.place ?? null)
@@ -61,7 +67,12 @@ const fromYou = computed(() => {
 
 function onSelect(id: string) {
   selected.value = id
+  if (id.startsWith('place:')) placeSheet.open(id.slice(6))
 }
+// The place's pin stays highlighted while its sheet is open, and lets go when the sheet closes.
+watch(() => placeSheet.value.value, (id, was) => {
+  if (!id && was && selected.value === `place:${was}`) selected.value = null
+})
 
 watch(() => route.query.focus, (f) => {
   if (typeof f === 'string') selected.value = f
@@ -85,16 +96,11 @@ const nextUp = computed(() => {
   return g.focus?.place ? g.focus : null
 })
 
+/** "Mark done" and its undo go through the same tick as everywhere else (toast, stamps earned, Log). */
 function toggleDone() {
   const s = selStop.value
   if (!s) return
-  v.mark(s.stop.id, s.state === 'done' ? null : 'done')
-  if (s.state !== 'done') toast(`Done: ${s.stop.title}`, { tone: 'ok' })
-}
-
-function addPlace() {
-  if (!selPlace.value) return
-  router.push({ query: { ...route.query, edit: 'new', from: `place:${selPlace.value.id}`, day: plan.value?.view.day.id ?? v.today.value?.view.day.id ?? trip.value?.days[0]?.id } })
+  actions.markStop(s.stop, s.state === 'done' ? null : 'done')
 }
 </script>
 
@@ -147,7 +153,7 @@ function addPlace() {
       </div>
     </div>
 
-    <div class="ctl" :class="{ raised: !!(selStop || selPlace || (geo.fix.value && nextUp)) }">
+    <div class="ctl" :class="{ raised: !!(selStop || (geo.fix.value && nextUp)) }">
       <button class="btn icon round" type="button" aria-label="Fit the map" title="Fit" @click="mapRef?.fit()">
         <AppIcon name="expand" />
       </button>
@@ -186,31 +192,6 @@ function addPlace() {
           </button>
         </div>
       </div>
-      <div v-else-if="selPlace" class="selcard card">
-        <div class="row top">
-          <div class="sc-pic art-frame">
-            <SceneArt class="scene" :scene="selPlace.scene" :tod="selPlace.tod ?? 'day'" :lazy="false" />
-          </div>
-          <div class="grow stack tight">
-            <span class="kicker">{{ selPlace.category === 'photo' ? 'Photo spot' : selPlace.category === 'food' ? 'Food' : 'Sight' }}<template v-if="selPlace.area"> · {{ selPlace.area }}</template></span>
-            <b class="sc-t">{{ selPlace.name }}</b>
-            <p class="small muted clamp-2">
-              {{ selPlace.text }}
-            </p>
-          </div>
-          <button class="btn icon sm plain round" type="button" aria-label="Close" @click="selected = null">
-            <AppIcon name="x" />
-          </button>
-        </div>
-        <div class="row acts">
-          <button class="btn sm ghost grow" type="button" @click="addPlace">
-            <AppIcon name="plus" size="sm" />Add to plan
-          </button>
-          <a v-if="selPoint" class="btn sm primary grow" :href="directionsUrl(selPoint, fromYou?.est.mode === 'transit' ? 'transit' : 'walking', geo.fix.value)" target="_blank" rel="noopener">
-            <AppIcon name="navigate" size="sm" />Directions
-          </a>
-        </div>
-      </div>
       <div v-else-if="geo.fix.value && nextUp" class="selcard card nextcard">
         <DirectionPill :from="geo.fix.value" :to="nextUp.place!" :heading="geo.heading.value" :name="nextUp.title" />
         <button class="btn sm icon" type="button" :aria-label="`Show ${nextUp.title}`" @click="selected = nextUp.id">
@@ -229,7 +210,8 @@ function addPlace() {
   position: fixed;
   left: 0;
   right: 0;
-  top: calc(var(--top-h) + var(--safe-t) + 1px);
+  /* Below the header, and below the preview bar and the update banner when they show (the shell sets --shell-extra). */
+  top: calc(var(--top-h) + var(--safe-t) + 1px + var(--shell-extra, 0px));
   bottom: calc(var(--tab-h) + var(--safe-b));
   z-index: 1;
 }
@@ -237,7 +219,8 @@ function addPlace() {
 .mappage :deep(.mapview) { position: absolute; inset: 0; }
 .topbar { position: absolute; left: 0; right: 0; top: 0; z-index: 500; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; pointer-events: none; }
 .topbar > * { pointer-events: auto; }
-.chips { margin: 0; padding: 2px 12px 4px; gap: 6px; }
+/* 5 px above and below: the chips' 44 px touch areas fit inside the scrolling row. */
+.chips { margin: 0; padding: 5px 12px; gap: 6px; }
 .dchip, .lchip { min-height: 36px; padding: 4px 13px; font-size: 13.5px; background: var(--surface); color: var(--fg); box-shadow: 0 1px 4px rgba(0, 0, 0, .18); border-color: var(--line); gap: 6px; }
 .dchip[aria-pressed="true"], .lchip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .dchip b { font-weight: 700; }

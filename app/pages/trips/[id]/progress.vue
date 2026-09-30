@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 import type { StopKind } from '#shared/types/trip'
+import { costToCents } from '#shared/utils/costs'
 import type { ResolvedStop } from '#shared/utils/plan'
 import { fmtClock } from '#shared/utils/time'
 
@@ -8,6 +9,12 @@ const v = useTripView()
 const route = useRoute()
 const router = useRouter()
 const sheet = useQueryState('stop')
+const actions = useTripActions()
+/** What's left: a marked stop leaves the list and the next slides under your finger, so a double tap marks only one. */
+const tapOk = tapGuard()
+function markLeft(st: ResolvedStop, status: 'done' | 'skipped', e: MouseEvent) {
+  if (tapOk(e)) actions.markStop(st, status)
+}
 const trip = v.trip
 const s = v.summary
 
@@ -26,9 +33,30 @@ const kinds = computed(() => {
 })
 const w = (n: number, total: number) => (total ? `${(n / total) * 100}%` : '0%')
 
-// Money
+// Money: the trip days' costs against the plan (the ledger's numbers, as on Costs).
 const money2 = (n: number) => money(n, trip.value?.currency ?? 'EUR')
-const moneyMax = computed(() => Math.max(1, ...(s.value?.days ?? []).map(d => Math.max(d.planned, d.spent))))
+const cents = (n: number) => moneyExact(n, trip.value?.currency ?? 'EUR')
+const costs = v.costs
+const moneyCard = computed(() => {
+  const c = costs.value
+  const t = trip.value
+  if (!c || !t) return null
+  const { spent, planned } = c.trip
+  const overCents = planned > 0 ? costToCents(spent) - costToCents(planned) : 0
+  // Over the plan says so in words too, not only in amber.
+  const note = [overCents > 0 ? `${cents(overCents / 100)} over the plan` : '', spent > 0 ? moneyHome(spent, t) : ''].filter(Boolean).join(' · ')
+  return {
+    spent: cents(spent),
+    planned: planned > 0 ? money2(planned) : '',
+    fill: planned > 0 ? `${Math.min(100, (spent / planned) * 100)}%` : '0%',
+    over: overCents > 0,
+    note,
+  }
+})
+/** What was logged for a stop (any category), from the costs ledger. */
+const stopSpent = (stopId: string) => costs.value?.byStop[stopId] ?? 0
+/** What a trip day cost (where you stay not included), from the costs ledger. */
+const daySpent = (dayId: string) => costs.value?.byDay[dayId]?.spent ?? 0
 
 // Ratings
 const topRated = computed(() => {
@@ -47,13 +75,13 @@ const tagCounts = computed(() => {
   return [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
 })
 
-// Journal feed
+// Journal feed: what you did, rated, wrote or paid for, day by day.
 const journal = computed(() => v.plans.value.map((p) => {
   const items = p.stops
-    .filter(st => p.states[st.id] === 'done' || p.states[st.id] === 'skipped' || v.progress.value.feedback[st.id])
-    .map(st => ({ stop: st, state: p.states[st.id]!, fb: v.progress.value.feedback[st.id], at: v.progress.value.stops[st.id]?.at }))
-  return { plan: p, note: v.progress.value.dayNotes[p.view.day.id], items }
-}).filter(d => d.items.length || d.note?.note || d.note?.rating))
+    .filter(st => p.states[st.id] === 'done' || p.states[st.id] === 'skipped' || v.progress.value.feedback[st.id] || stopSpent(st.id) > 0)
+    .map(st => ({ stop: st, state: p.states[st.id]!, fb: v.progress.value.feedback[st.id], spent: stopSpent(st.id), at: v.progress.value.stops[st.id]?.at }))
+  return { plan: p, note: v.progress.value.dayNotes[p.view.day.id], spent: daySpent(p.view.day.id), items }
+}).filter(d => d.items.length || d.note?.note || d.note?.rating || d.spent > 0))
 
 const photos = computed(() => {
   const out: string[] = []
@@ -84,22 +112,26 @@ function exportMarkdown() {
   if (!t || !sum) return
   const lines: string[] = []
   lines.push(`# ${t.title}: travel journal`, '')
-  lines.push(`${fmtRange(t.start, t.end)} · ${sum.all.done} of ${sum.all.total} stops done${sum.avgRating ? ` · average ${sum.avgRating.toFixed(1)}/5` : ''}${sum.spent ? ` · ${money2(sum.spent)} spent` : ''}`, '')
+  const tripSpent = costs.value?.trip.spent ?? 0
+  lines.push(`${fmtRange(t.start, t.end)} · ${sum.all.done} of ${sum.all.total} stops done${sum.avgRating ? ` · average ${sum.avgRating.toFixed(1)}/5` : ''}${tripSpent ? ` · ${cents(tripSpent)} spent` : ''}`, '')
   if (v.progress.value.tripNote) lines.push(v.progress.value.tripNote, '')
   for (const p of v.plans.value) {
     const note = v.progress.value.dayNotes[p.view.day.id]
+    const spent = daySpent(p.view.day.id)
     lines.push(`## ${fmtDate(p.view.day.date, 'long')}: ${p.view.title || p.view.day.label}`)
     if (note?.rating) lines.push(stars(note.rating))
+    if (spent) lines.push(`Spent: ${cents(spent)}`)
     if (note?.note) lines.push('', note.note)
     lines.push('')
     for (const st of p.stops) {
       if (st.minor) continue
       const state = p.states[st.id]
       const fb = v.progress.value.feedback[st.id]
+      const paid = stopSpent(st.id)
       const box = state === 'done' ? '[x]' : state === 'skipped' ? '[-]' : '[ ]'
       let line = `- ${box} ${fmtClock(st.start)} ${st.title}`
       if (fb?.rating) line += ` · ${stars(fb.rating)}`
-      if (fb?.spent) line += ` · ${money2(fb.spent)}`
+      if (paid) line += ` · ${cents(paid)}`
       if (fb?.tags?.length) line += ` · ${fb.tags.map(x => `#${x.replace(/\s+/g, '')}`).join(' ')}`
       lines.push(line)
       if (fb?.note) lines.push(`  > ${fb.note.replace(/\n/g, '\n  > ')}`)
@@ -202,28 +234,21 @@ function exportMarkdown() {
           </div>
         </section>
 
-        <section class="card pad">
+        <section v-if="moneyCard" class="card pad mcard" aria-labelledby="progress-money">
           <div class="row between">
-            <h2 class="h3">
+            <h2 id="progress-money" class="h3">
               Money
             </h2>
-            <span class="small muted num">{{ money2(s.spent) }} of ~{{ money2(s.planned) }}</span>
+            <NuxtLink :to="`/trips/${trip.id}/costs`" class="btn sm ghost">
+              See costs<AppIcon name="chevr" size="sm" />
+            </NuxtLink>
           </div>
-          <div class="money">
-            <div v-for="d in s.days" :key="d.id" class="mrow">
-              <span class="ml tiny strong">{{ fmtDate(d.date, 'weekday') }}</span>
-              <span class="mbars">
-                <span class="mb planned" :style="{ width: `${(d.planned / moneyMax) * 100}%` }" />
-                <span class="mb spent" :class="{ over: d.spent > d.planned && d.planned > 0 }" :style="{ width: `${(d.spent / moneyMax) * 100}%` }" />
-              </span>
-              <span class="mv tiny num">{{ d.spent ? money2(d.spent) : '–' }}</span>
-            </div>
-          </div>
-          <p class="tiny faint legend-m">
-            <i class="sw planned" />Planned budget <i class="sw spent" />What you logged
-            <template v-if="trip.fx && s.spent">
-              · ≈ {{ money(s.spent * trip.fx.rate, trip.fx.homeCurrency) }}
-            </template>
+          <p class="mline">
+            <b class="tnum">{{ moneyCard.spent }}</b><span v-if="moneyCard.planned" class="muted tnum"> of ~{{ moneyCard.planned }}</span>
+          </p>
+          <span v-if="moneyCard.planned" class="bar" aria-hidden="true"><i :class="moneyCard.over ? 'over' : 'fill'" :style="{ width: moneyCard.fill }" /></span>
+          <p v-if="moneyCard.note" class="small muted tnum mnote">
+            {{ moneyCard.note }}
           </p>
         </section>
 
@@ -278,7 +303,10 @@ function exportMarkdown() {
       <section v-for="d in journal" :key="d.plan.view.day.id" class="jday">
         <div class="sec-h">
           <h2>{{ fmtDate(d.plan.view.day.date, 'long') }}</h2>
-          <span v-if="d.note?.rating" class="aside stars-t">{{ stars(d.note.rating) }}</span>
+          <span v-if="d.note?.rating || d.spent" class="aside">
+            <span v-if="d.note?.rating" class="stars-t">{{ stars(d.note.rating) }}</span>
+            <span v-if="d.spent" class="tnum spent-d">Spent: {{ cents(d.spent) }}</span>
+          </span>
         </div>
         <p v-if="d.note?.note" class="card pad dnote">
           {{ d.note.note }}
@@ -290,18 +318,18 @@ function exportMarkdown() {
               <span class="grow strong">{{ it.stop.title }}</span>
               <StateBadge :state="it.state" />
             </button>
-            <div v-if="it.fb" class="fbody">
-              <div v-if="it.fb.rating || it.fb.spent" class="row wrap">
-                <StarRating v-if="it.fb.rating" :model-value="it.fb.rating" :size="16" readonly />
-                <span v-if="it.fb.spent" class="chip num">{{ money2(it.fb.spent) }}</span>
+            <div v-if="it.fb || it.spent" class="fbody">
+              <div v-if="it.fb?.rating || it.spent" class="row wrap">
+                <StarRating v-if="it.fb?.rating" :model-value="it.fb.rating" :size="16" readonly />
+                <span v-if="it.spent" class="chip num">{{ cents(it.spent) }}</span>
               </div>
-              <p v-if="it.fb.note" class="fnote">
+              <p v-if="it.fb?.note" class="fnote">
                 {{ it.fb.note }}
               </p>
-              <div v-if="it.fb.tags?.length" class="row wrap">
+              <div v-if="it.fb?.tags?.length" class="row wrap">
                 <span v-for="t in it.fb.tags" :key="t" class="chip">{{ t }}</span>
               </div>
-              <div v-if="it.fb.photos?.length" class="pgrid small-grid">
+              <div v-if="it.fb?.photos?.length" class="pgrid small-grid">
                 <PhotoThumb v-for="p in it.fb.photos" :key="p" :id="p" />
               </div>
             </div>
@@ -329,26 +357,26 @@ function exportMarkdown() {
           <span class="aside">{{ d.upcoming.length }} to come<template v-if="d.missed.length"> · {{ d.missed.length }} not marked</template></span>
         </div>
         <div class="card rows">
-          <div v-for="st in d.missed" :key="st.id" class="row-item">
+          <div v-for="st in d.missed" :key="st.id" class="row-item lrow">
             <span class="num small faint tm">{{ fmtClock(st.start) }}</span>
-            <button type="button" class="grow ellipsis link-like" @click="sheet.open(st.id)">
-              {{ st.title }}
+            <button type="button" class="grow link-like" @click="sheet.open(st.id)">
+              <span class="ellipsis">{{ st.title }}</span>
             </button>
             <span class="chip t-warn hide-xs">Not marked</span>
-            <button class="btn xs ok" type="button" @click="v.mark(st.id, 'done')">
+            <button class="btn xs ok" type="button" @click="markLeft(st, 'done', $event)">
               Did it
             </button>
-            <button class="btn xs" type="button" @click="v.mark(st.id, 'skipped')">
+            <button class="btn xs" type="button" @click="markLeft(st, 'skipped', $event)">
               Skipped
             </button>
           </div>
-          <div v-for="st in d.upcoming" :key="st.id" class="row-item">
+          <div v-for="st in d.upcoming" :key="st.id" class="row-item lrow">
             <span class="num small faint tm">{{ fmtClock(st.start) }}</span>
-            <button type="button" class="grow ellipsis link-like" @click="sheet.open(st.id)">
-              {{ st.title }}
+            <button type="button" class="grow link-like" @click="sheet.open(st.id)">
+              <span class="ellipsis">{{ st.title }}</span>
             </button>
             <StateBadge v-if="d.plan.states[st.id] !== 'upcoming'" :state="d.plan.states[st.id]!" />
-            <button class="btn xs icon" type="button" :aria-label="`Mark ${st.title} as done`" @click="v.mark(st.id, 'done')">
+            <button class="btn xs icon" type="button" :aria-label="`Mark ${st.title} as done`" @click="markLeft(st, 'done', $event)">
               <AppIcon name="check" size="xs" />
             </button>
           </div>
@@ -385,29 +413,29 @@ function exportMarkdown() {
 .sw.skipped { background: var(--closed); opacity: .6; }
 .sw.missed { background: var(--warn); opacity: .75; }
 .sw.left { background: var(--surface-2); outline: 1px solid var(--line); }
-.sw.planned { background: transparent; outline: 1.5px dashed var(--fg-3); vertical-align: -1px; margin: 0 4px 0 0; }
-.sw.spent { background: var(--accent); vertical-align: -1px; margin: 0 4px 0 10px; }
 .tabs { margin: 16px 0; }
+/* Touch targets of at least 44 px: the view tabs, the day and prep rows, rated stops, stop names. */
+.tabs button { min-height: 44px; }
 @media (max-width: 420px) { .tabs :deep(.i) { display: none; } }
 .grid2 { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 820px) { .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.days, .kinds, .money, .top { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
-.drow { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg); }
+.days, .kinds, .top { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.drow { display: flex; align-items: center; gap: 12px; min-height: 44px; text-decoration: none; color: var(--fg); }
 .dl { width: 76px; display: flex; flex-direction: column; flex: none; }
 .krow { display: flex; align-items: center; gap: 12px; }
 .kic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); flex: none; }
 .prep { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.pp { display: grid; grid-template-columns: 1fr auto; gap: 6px; text-decoration: none; color: var(--fg); }
+.pp { display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 6px; min-height: 44px; text-decoration: none; color: var(--fg); }
 .pp .bar { grid-column: 1 / -1; }
-.mrow { display: grid; grid-template-columns: 36px minmax(0, 1fr) 64px; align-items: center; gap: 10px; }
-.mbars { position: relative; height: 18px; }
-.mb { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
-.mb.planned { border: 1.5px dashed var(--fg-3); }
-.mb.spent { background: var(--accent); top: 4px; bottom: 4px; }
-.mb.spent.over { background: var(--bad); }
-.mv { text-align: right; }
-.legend-m { margin-top: 12px; }
-.trow { display: flex; align-items: center; gap: 12px; background: none; border: 0; padding: 0; text-align: left; color: var(--fg); }
+.mcard { display: flex; flex-direction: column; gap: 10px; }
+.mline { font-size: 15px; }
+.mline b { font-size: 24px; font-weight: 700; letter-spacing: -.01em; }
+.bar > i.over { background: var(--warn); }
+.spent-d { font-size: 13px; color: var(--fg-2); font-weight: 600; }
+.aside .stars-t + .spent-d { margin-left: 8px; }
+.trow { display: flex; align-items: center; gap: 12px; min-height: 44px; background: none; border: 0; padding: 0; text-align: left; color: var(--fg); }
+/* Only the title gives way to a long name: the stars, badges and buttons beside it keep their size. */
+.trow > :not(.grow), .lrow > :not(.grow) { flex: none; }
 .tpic { width: 40px; height: 40px; border-radius: 10px; flex: none; }
 .tagc { margin-top: 14px; gap: 6px; }
 .tnote { margin-bottom: 14px; }
@@ -422,8 +450,11 @@ function exportMarkdown() {
 .fbody { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 .fnote { white-space: pre-wrap; font-size: 15px; }
 .exp { margin-top: 20px; }
+/* "Before you go": .card-link would make these links blocks; they are rows (icon, text, chevron at the end). */
+.card-link.row { display: flex; }
 .tm { width: 44px; flex: none; }
-.link-like { background: none; border: 0; padding: 0; text-align: left; color: var(--fg); font-weight: 600; }
+.lrow { padding-top: 6px; padding-bottom: 6px; }
+.link-like { display: flex; align-items: center; min-height: 44px; background: none; border: 0; padding: 0; text-align: left; color: var(--fg); font-weight: 600; }
 .link-like:hover { color: var(--accent); }
 .stars-t { color: var(--gold); letter-spacing: .08em; }
 @media (max-width: 420px) { .hide-xs { display: none; } }

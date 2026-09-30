@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Stop, StopKind, StopTag } from '#shared/types/trip'
 import { parseLatLng } from '#shared/utils/geo'
+import { placeFirstClock } from '#shared/utils/places'
 import { editableStops, findStop, slugify, uid } from '#shared/utils/plan'
 import { fmtClock } from '#shared/utils/time'
 
@@ -26,9 +27,11 @@ interface FormState {
   lng: number | null
   tags: StopTag[]
   minor: boolean
+  /** The saved place a new stop was added from (Stop.placeId): it stamps that place when done. */
+  placeId: string
 }
 
-const f = reactive<FormState>({ title: '', dayId: '', start: '10:00', end: '', kind: 'sight', tip: '', cost: '', placeName: '', lat: null, lng: null, tags: [], minor: false })
+const f = reactive<FormState>({ title: '', dayId: '', start: '10:00', end: '', kind: 'sight', tip: '', cost: '', placeName: '', lat: null, lng: null, tags: [], minor: false, placeId: '' })
 const paste = ref('')
 const pasteError = ref(false)
 const fitKey = ref(0)
@@ -40,6 +43,20 @@ function fromInput(s: string): number | undefined {
   const min = (h ?? 0) * 60 + (m ?? 0)
   // Small hours belong to the night before.
   return min < 300 ? min + 1440 : min
+}
+
+/**
+ * Where a new stop starts: a photo spot at the first time of its best light (on today's day only while that
+ * is still ahead); otherwise on today's day the next half hour after now, and on any other day 10:00.
+ */
+function defaultStart(dayId: string, bestTime?: string): string {
+  const today = v.today.value?.view.day.id === dayId ? v.moment.value?.minutes : undefined
+  const best = placeFirstClock(bestTime)
+  // A best time in the small hours (before 05:00) is that night, after midnight.
+  const bestMin = best === null ? null : best < 300 ? best + 1440 : best
+  if (bestMin !== null && (today === undefined || bestMin > today)) return fmtClock(bestMin)
+  if (today !== undefined) return fmtClock(Math.floor(today / 30) * 30 + 30)
+  return '10:00'
 }
 
 function load() {
@@ -62,12 +79,13 @@ function load() {
       lng: s.place?.lng ?? null,
       tags: [...(s.tags ?? [])],
       minor: !!s.minor,
+      placeId: s.placeId ?? '',
     })
   }
   else {
     const qDay = typeof route.query.day === 'string' ? route.query.day : undefined
     const dayId = t.days.find(d => d.id === qDay)?.id ?? v.today.value?.view.day.id ?? t.days[0]?.id ?? ''
-    Object.assign(f, { title: '', dayId, start: '10:00', end: '', kind: 'sight', tip: '', cost: '', placeName: '', lat: null, lng: null, tags: [], minor: false })
+    Object.assign(f, { title: '', dayId, start: defaultStart(dayId), end: '', kind: 'sight', tip: '', cost: '', placeName: '', lat: null, lng: null, tags: [], minor: false, placeId: '' })
     const from = typeof route.query.from === 'string' ? route.query.from : ''
     if (from.startsWith('place:')) {
       const p = t.places?.find(x => x.id === from.slice(6))
@@ -79,9 +97,13 @@ function load() {
         f.placeName = p.place?.name ?? p.name
         f.lat = p.place?.lat ?? null
         f.lng = p.place?.lng ?? null
+        f.placeId = p.id
+        if (p.category === 'photo') f.start = defaultStart(dayId, p.bestTime)
       }
     }
-    if (typeof route.query.at === 'string') f.start = route.query.at
+    // An opener may name the start ("?at=14:30"); a preview's "?at=2026-10-09T16:40" on Now is not a start.
+    const at = route.query.at
+    if (typeof at === 'string' && /^\d{1,2}:\d{2}$/.test(at)) f.start = at.padStart(5, '0')
   }
   fitKey.value++
 }
@@ -148,6 +170,8 @@ function save() {
   const t = v.trip.value
   if (!t || !valid.value || endBeforeStart.value) return
   const base: Stop = found.value ? { ...found.value.stop } : { id: `${slugify(f.title)}-${uid('s').slice(-5)}`, start: 0, timeLabel: '', kind: f.kind, title: '', custom: true }
+  // A stop added from a saved place is that place: done, it stamps it, and the place reads "In your plan".
+  if (!found.value && f.placeId && t.places?.some(p => p.id === f.placeId)) base.placeId = f.placeId
   const next: Stop = {
     ...base,
     title: f.title.trim(),
@@ -293,7 +317,7 @@ function remove() {
       </label>
     </form>
     <template #footer>
-      <button v-if="!isNew" class="btn danger" type="button" @click="remove">
+      <button v-if="!isNew" class="btn danger" type="button" aria-label="Delete stop" @click="remove">
         <AppIcon name="trash" size="sm" /><span class="hide-xs">Delete</span>
       </button>
       <span class="grow" />

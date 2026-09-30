@@ -170,9 +170,10 @@ export const useCloud = createGlobalState(() => {
     finally {
       writing.delete(key)
       setStatus()
-      // Catch up with changes made here meanwhile. (If another device got there first,
-      // its version arrives in the next snapshot, which decides again.)
-      if (written) reconcile()
+      // Catch up with changes made here meanwhile. (If another device got there first, its version arrives in
+      // the next snapshot, which decides again. When that snapshot came while this write was on its way, it
+      // skipped this item, so decide again now: otherwise both devices would stay "synced" apart.)
+      if (written || (remote.get(key)?.updatedAt ?? -1) > (basis ?? -1)) reconcile()
     }
   }
 

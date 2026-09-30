@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Trip, TripProgress } from '#shared/types/trip'
+import { emptyProgress } from '#shared/utils/plan'
+import { mergeProgress } from '#shared/utils/sync'
 
 const trips = useTrips()
 const store = useProgressStore()
@@ -9,7 +11,7 @@ const mapNote = computed(() => {
   if (!gmaps.key) return 'Google Maps isn’t set up in this copy of the app.'
   if (gmaps.provider.value === 'osm') return 'A clean map that’s saved for offline use as you look around. Leave-by times still come from Google when you’re online.'
   if (gmaps.tilesWork.value === false) return 'Google Maps isn’t answering yet (the key needs the Map Tiles API and billing), so the OpenStreetMap map shows instead.'
-  return 'Shops, restaurants and transit from Google, with real walking and transit times for “leave by”. Offline, the map switches to the saved OpenStreetMap tiles.'
+  return 'Shops, restaurants and transit from Google, with real walking and transit times for “leave by”. Offline, the map shows the areas you looked at with OpenStreetMap on.'
 })
 const { choice } = useTheme()
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -44,8 +46,14 @@ async function importFile(e: Event) {
         list.push({ ...t, bookings: t.bookings ?? [], packing: t.packing ?? [] })
         added++
       }
+      // What you did merges with what the backup holds (costs and stamps record by record, the newer copy
+      // winning), so an older backup never takes away newer ticks, costs or stamps made on this device.
       const p = data.progress?.[t.id]
-      if (p) store.value[t.id] = p
+      if (p && typeof p === 'object' && !Array.isArray(p)) {
+        // With nothing here yet, merged into an empty one all the same: a hand-edited backup whose costs or stamps
+        // are lists (not records by id) would otherwise swallow every cost and stamp added after it.
+        store.value[t.id] = mergeProgress(store.value[t.id] ?? emptyProgress(), p)
+      }
     }
     trips.replaceAll(list)
     toast(`Imported: ${added} new, ${replaced} updated`, { tone: 'ok' })

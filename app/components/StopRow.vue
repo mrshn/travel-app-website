@@ -8,7 +8,8 @@ const props = defineProps<{
   feedback?: Feedback
   last?: boolean
 }>()
-const emit = defineEmits<{ open: [], toggle: [] }>()
+/** `toggle` carries the click, so a list whose rows move can ignore the second tap of a double tap (tapGuard). */
+const emit = defineEmits<{ open: [], toggle: [e: MouseEvent] }>()
 const done = computed(() => props.state === 'done')
 const tags = computed(() => props.stop.tags ?? [])
 </script>
@@ -43,7 +44,7 @@ const tags = computed(() => props.stop.tags ?? [])
       :class="{ on: done }"
       :aria-pressed="done"
       :aria-label="done ? `Mark “${stop.title}” as not done` : `Mark “${stop.title}” as done`"
-      @click="emit('toggle')"
+      @click="emit('toggle', $event)"
     >
       <AppIcon name="check" />
     </button>
@@ -88,6 +89,7 @@ const tags = computed(() => props.stop.tags ?? [])
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  min-height: 44px;
   margin: 4px 0;
   padding: 9px 10px;
   border-radius: 12px;
@@ -100,7 +102,12 @@ const tags = computed(() => props.stop.tags ?? [])
 .opt { font-size: 11.5px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-3); }
 .title { font-weight: 650; font-size: 15.5px; line-height: 1.3; }
 .meta { display: flex; flex-wrap: wrap; gap: 5px; }
+/* A long price ("Piazza free · basin €2") wraps inside its chip instead of running under the tick. */
+.meta .chip { max-width: 100%; white-space: normal; }
+/* Above the rows after it, so no later row covers its 44 px touch area (main.css). */
 .tick {
+  position: relative;
+  z-index: 1;
   margin-top: 8px;
   width: 38px;
   height: 38px;
@@ -127,12 +134,12 @@ const tags = computed(() => props.stop.tags ?? [])
 .s-skipped .node, .s-missed .node { opacity: .6; }
 .s-skipped .time, .s-done .time { color: var(--fg-3); }
 
-/* small logistics steps */
-.minor .time { padding-top: 9px; font-size: 12.5px; color: var(--fg-2); }
-.minor .node { width: 22px; height: 22px; margin-top: 7px; border-width: 1.5px; }
-.minor .body { padding: 6px 10px; margin: 1px 0; }
+/* small logistics steps: compact, but each row is a full 44 px touch target (body and tick) */
+.minor .time { padding-top: 15px; font-size: 12.5px; color: var(--fg-2); }
+.minor .node { width: 22px; height: 22px; margin-top: 11px; border-width: 1.5px; }
+.minor .body { justify-content: center; padding: 6px 10px; margin: 0; }
 .minor .title { font-size: 14px; font-weight: 550; color: var(--fg-2); }
-.minor .tick { width: 30px; height: 30px; margin-top: 4px; border-radius: 9px; }
+.minor .tick { width: 30px; height: 30px; margin-top: 7px; border-radius: 9px; }
 .minor .tick .i { width: 16px; height: 16px; }
 .minor.s-now .body { background: var(--accent-soft); }
 </style>

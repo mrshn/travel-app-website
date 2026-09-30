@@ -1,9 +1,10 @@
 /** Views over a trip and what you did: resolved stops, states and progress numbers. */
 import type { Choice, Day, Scene, Stop, StopKind, Trip, TripProgress } from '../types/trip'
 import type { TripMoment } from './time'
+import { costSummary, type CostSummary } from './costs'
 
 export function emptyProgress(): TripProgress {
-  return { stops: {}, feedback: {}, choices: {}, bookings: {}, packing: {}, dayNotes: {} }
+  return { stops: {}, feedback: {}, choices: {}, bookings: {}, packing: {}, dayNotes: {}, expenses: {}, stamps: {} }
 }
 
 /** Which version of the plan is on (e.g. Colosseum Saturday or Sunday). */
@@ -171,7 +172,10 @@ export interface TripSummary {
   all: Tally
   days: DaySummary[]
   kinds: Partial<Record<StopKind, Tally>>
+  /** Costs on trip days, without where you stay (costSummary().trip.spent). */
   spent: number
+  /** Every live cost: any day (before and after the trip too) and any category (costSummary().all). */
+  spentAll: number
   planned: number
   rated: number
   avgRating: number
@@ -198,20 +202,23 @@ export function planDays(trip: Trip, p: TripProgress, m: TripMoment): DayPlan[] 
   })
 }
 
-export function summarize(trip: Trip, p: TripProgress, m: TripMoment, plans = planDays(trip, p, m)): TripSummary {
+/** Money comes from the costs ledger (costSummary), so every screen shows the same totals. */
+export function summarize(
+  trip: Trip,
+  p: TripProgress,
+  m: TripMoment,
+  plans = planDays(trip, p, m),
+  costs: CostSummary = costSummary(trip, p, plans),
+): TripSummary {
   const all = emptyTally()
   const kinds: Partial<Record<StopKind, Tally>> = {}
-  let spent = 0
   let rated = 0
   let ratingSum = 0
   let photos = 0
   let notes = 0
   const days: DaySummary[] = plans.map(({ view, stops, states }) => {
     const t = emptyTally()
-    let daySpent = 0
     for (const s of stops) {
-      const fb = p.feedback[s.id]
-      if (fb?.spent) daySpent += fb.spent
       if (!counts(s)) continue
       const st = states[s.id] ?? 'upcoming'
       add(t, st)
@@ -220,8 +227,7 @@ export function summarize(trip: Trip, p: TripProgress, m: TripMoment, plans = pl
       add(k, st)
     }
     const note = p.dayNotes[view.day.id]
-    if (note?.extraSpent) daySpent += note.extraSpent
-    spent += daySpent
+    const daySpent = costs.byDay[view.day.id]?.spent ?? 0
     const planned = trip.budget?.find(b => b.dayId === view.day.id)?.values.reduce((a, b) => a + b, 0) ?? 0
     return {
       id: view.day.id,
@@ -249,7 +255,8 @@ export function summarize(trip: Trip, p: TripProgress, m: TripMoment, plans = pl
     all,
     days,
     kinds,
-    spent,
+    spent: costs.trip.spent,
+    spentAll: costs.all,
     planned: days.reduce((a, d) => a + d.planned, 0),
     rated,
     avgRating: rated ? ratingSum / rated : 0,

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useWakeLock } from '@vueuse/core'
+import { costToCents } from '#shared/utils/costs'
 import { liveGuide } from '#shared/utils/guide'
 import { directionsUrl, fmtDistance, type LatLng } from '#shared/utils/geo'
+import { placeStampDate } from '#shared/utils/places'
 import { dayTally, type ResolvedStop } from '#shared/utils/plan'
 import { deviceTimeZone, fmtClock, fmtCountdown, fmtDuration, parseClock, zoned, zonedToDate, zoneGap } from '#shared/utils/time'
 
@@ -10,6 +12,8 @@ const route = useRoute()
 const geo = useGeo()
 const sheet = useQueryState('stop')
 const editor = useQueryState('edit')
+const actions = useTripActions()
+const costSheet = useCostSheet()
 const trip = v.trip
 const m = v.moment
 const previewOpen = ref(false)
@@ -69,14 +73,84 @@ function directionsTo(s: ResolvedStop) {
   return directionsUrl(s.place!, mapsMode(guide.value?.focusLeg ?? guide.value?.leg), you.value)
 }
 
-function mark(s: ResolvedStop, status: 'done' | 'skipped') {
-  const before = v.statusOf(s.id) ?? null
-  v.mark(s.id, status)
-  toast(status === 'done' ? `Done: ${s.title}` : `Skipped: ${s.title}`, {
-    tone: status === 'done' ? 'ok' : 'info',
-    action: { label: 'Undo', run: () => v.mark(s.id, before) },
-  })
+// Every tick goes through markStop(): the same toast (stamps, "Log €7", Undo) as on every other screen.
+// A marked stop leaves its list (or the hero moves on) and the next one takes its place under your finger: the
+// second tap of a double tap is ignored, so it can't mark that one too.
+const tapOk = tapGuard()
+function mark(s: ResolvedStop, status: 'done' | 'skipped' | null, e?: Event) {
+  if (tapOk(e)) actions.markStop(s, status)
 }
+function toggleDone(s: ResolvedStop, e?: Event) {
+  mark(s, today.value?.states[s.id] === 'done' ? null : 'done', e)
+}
+/** Get ready: a ticked booking leaves the list, so a double tap must not tick the next one too. */
+function guardBox(e: MouseEvent) {
+  if (!tapOk(e)) e.preventDefault()
+}
+
+// ---------- money row (during the trip) ----------
+const todayMoney = computed(() => {
+  const c = v.todayCosts.value
+  const t = trip.value
+  if (!c || !t) return null
+  const spent = costToCents(c.spent)
+  const plan = costToCents(c.planned)
+  return {
+    spent: moneyExact(spent / 100, t.currency),
+    left: plan > 0 && spent <= plan ? moneyExact((plan - spent) / 100, t.currency) : '',
+    over: plan > 0 && spent > plan ? moneyExact((spent - plan) / 100, t.currency) : '',
+    home: spent > 0 ? moneyHome(spent / 100, t) : '',
+  }
+})
+/**
+ * Opens the cost sheet for today. Its pad links the cost to the sight, food or night stop on now ("At …", as on
+ * Costs), and only a cost of that stop's own kind, since the plan's now is a guess of where you are.
+ */
+function addCost() {
+  costSheet.open({ dayId: day.value?.id })
+}
+
+// ---------- stamps ----------
+/** Stamps from stops of today's plan, and places stamped by hand today (05:00 rule). */
+const stampsToday = computed(() => {
+  const t = today.value
+  const tr = trip.value
+  const date = m.value?.dayDate
+  if (!t || !tr || !date) return 0
+  const ids = new Set(t.stops.map(s => s.id))
+  let n = 0
+  for (const info of v.stamps.value.values()) {
+    if (info.via === 'stop' ? !!info.stopId && ids.has(info.stopId) : placeStampDate(tr, info) === date) n++
+  }
+  return n
+})
+const stampCount = (n: number) => `${n} stamp${n === 1 ? '' : 's'}`
+
+// ---------- getting back (late at night) ----------
+/**
+ * During the trip, not on its last day, from 21:00 until 05:00 on the trip's clock (it runs past 24:00 until
+ * the day rolls over), when the day is done, a night stop is on now, or the next stop is one.
+ */
+const lateNight = computed(() => {
+  const mm = m.value
+  const t = trip.value
+  const g = guide.value
+  if (!mm || !t || !g || mm.phase !== 'during' || mm.dayIndex < 0 || mm.dayIndex >= t.days.length - 1) return false
+  if (mm.minutes < 21 * 60) return false
+  return g.mode === 'done' || g.mode === 'empty' || g.current?.kind === 'night' || g.next?.kind === 'night'
+})
+/** Above the hero once the day is done; otherwise under the Next card. */
+const homeFirst = computed(() => lateNight.value && (guide.value?.mode === 'done' || guide.value?.mode === 'empty'))
+/** Where the plan has you now: the latest stop that has started (not skipped) with a place. */
+const planHere = computed<LatLng | null>(() => {
+  const t = today.value
+  if (!t) return null
+  for (let i = t.stops.length - 1; i >= 0; i--) {
+    const s = t.stops[i]!
+    if (s.start <= minutes.value && s.place && t.states[s.id] !== 'skipped') return { lat: s.place.lat, lng: s.place.lng }
+  }
+  return null
+})
 
 const legText = computed(() => {
   const g = guide.value
@@ -195,6 +269,26 @@ const s = v.summary
 
       <div class="cols">
         <div class="main">
+          <!-- Late at night with the day done: the way home comes first -->
+          <HomeCard v-if="homeFirst" :day="day" :you="you" :near="planHere" />
+
+          <!-- Today's money: tap for Costs, Add for the cost sheet -->
+          <div v-if="todayMoney" class="card money">
+            <NuxtLink :to="`/trips/${trip.id}/costs`" class="mn-link">
+              <span class="mn-ic" aria-hidden="true"><AppIcon name="wallet" size="sm" /></span>
+              <span class="mn-txt">
+                <span class="mn-l1 parts tnum">
+                  <b class="part">{{ todayMoney.spent }} today</b>
+                  <span v-if="todayMoney.over || todayMoney.left" class="part"><span class="part-sep">&nbsp;·&nbsp;</span><span v-if="todayMoney.over" class="over">{{ todayMoney.over }} over today's plan</span><template v-else>{{ todayMoney.left }} left</template></span>
+                </span>
+                <span v-if="todayMoney.home" class="small muted tnum">{{ todayMoney.home }} spent</span>
+              </span>
+            </NuxtLink>
+            <button class="btn sm mn-add" type="button" aria-label="Add a cost" @click="addCost">
+              <AppIcon name="plus" size="sm" />Add
+            </button>
+          </div>
+
           <!-- The one thing to do now -->
           <section v-if="guide && (guide.mode === 'at' || guide.mode === 'go' || guide.mode === 'free') && focus" class="hero card" :class="`mode-${guide.mode} u-${guide.urgency ?? 'relaxed'}`">
             <div class="pic art-frame">
@@ -246,13 +340,13 @@ const s = v.summary
                 <AppIcon name="route" size="sm" />{{ legText }}
               </p>
               <div class="acts">
-                <button v-if="guide.mode === 'at'" class="btn ok lg grow" type="button" @click="mark(focus, 'done')">
+                <button v-if="guide.mode === 'at'" class="btn ok lg grow" type="button" @click="mark(focus, 'done', $event)">
                   <AppIcon name="check" />Done
                 </button>
                 <a v-if="focus.place" class="btn lg" :class="guide.mode === 'at' ? '' : 'primary grow'" :href="directionsTo(focus)" target="_blank" rel="noopener">
                   <AppIcon name="navigate" />{{ guide.mode === 'at' ? 'Go' : 'Directions' }}
                 </a>
-                <button class="btn lg icon" type="button" :aria-label="`Skip ${focus.title}`" title="Skip" @click="mark(focus, 'skipped')">
+                <button class="btn lg icon" type="button" :aria-label="`Skip ${focus.title}`" title="Skip" @click="mark(focus, 'skipped', $event)">
                   <AppIcon name="skip" />
                 </button>
                 <button class="btn lg icon" type="button" aria-label="Details and feedback" title="Details and feedback" @click="sheet.open(focus.id)">
@@ -309,17 +403,24 @@ const s = v.summary
               <SceneArt class="scene" :scene="sceneFor(next)" :tod="todFor(next.start, next.tod)" />
             </button>
             <div class="grow nx">
-              <span class="kicker">Next · {{ fmtClock(next.start) }}</span>
-              <button type="button" class="nx-title" @click="sheet.open(next.id)">
-                {{ next.title }}
-              </button>
-              <span class="leave num"><AppIcon name="clock" size="xs" />{{ leaveText }}</span>
+              <div class="nx-head">
+                <div class="nx-h">
+                  <span class="kicker">Next · {{ fmtClock(next.start) }}</span>
+                  <button type="button" class="nx-title hit" @click="sheet.open(next.id)">
+                    {{ next.title }}
+                  </button>
+                </div>
+                <a v-if="next.place" class="btn icon round" :href="directionsUrl(next.place, mapsMode(guide.leg), you)" target="_blank" rel="noopener" :aria-label="`Directions to ${next.title}`">
+                  <AppIcon name="navigate" />
+                </a>
+              </div>
+              <span class="leave tnum"><AppIcon name="clock" size="xs" /><span class="ellipsis">{{ leaveText }}</span></span>
               <span v-if="legText" class="small muted ellipsis">{{ legText }}</span>
             </div>
-            <a v-if="next.place" class="btn icon round" :href="directionsUrl(next.place, mapsMode(guide.leg), you)" target="_blank" rel="noopener" :aria-label="`Directions to ${next.title}`">
-              <AppIcon name="navigate" />
-            </a>
           </section>
+
+          <!-- Late at night: the way home, under the Next card -->
+          <HomeCard v-if="lateNight && !homeFirst" :day="day" :you="you" :near="planHere" />
 
           <!-- Catch up -->
           <section v-if="guide?.behind.length" class="card catch">
@@ -327,7 +428,7 @@ const s = v.summary
               <h2 class="h3">
                 Did you do these?
               </h2>
-              <span class="chip t-warn">{{ guide.behind.length }} not marked</span>
+              <span class="chip">{{ guide.behind.length }} not marked</span>
             </div>
             <div class="rows">
               <div v-for="b in guide.behind.slice(0, 4)" :key="b.id" class="row-item">
@@ -335,10 +436,10 @@ const s = v.summary
                 <button type="button" class="grow ellipsis link-like" @click="sheet.open(b.id)">
                   {{ b.title }}
                 </button>
-                <button class="btn xs ok" type="button" @click="mark(b, 'done')">
+                <button class="btn xs ok" type="button" @click="mark(b, 'done', $event)">
                   <AppIcon name="check" size="xs" />Yes
                 </button>
-                <button class="btn xs" type="button" @click="mark(b, 'skipped')">
+                <button class="btn xs" type="button" @click="mark(b, 'skipped', $event)">
                   No
                 </button>
               </div>
@@ -349,7 +450,7 @@ const s = v.summary
           <section v-if="laterList.length" class="later">
             <div class="sec-h">
               <h2>Later today</h2>
-              <NuxtLink class="aside" :to="{ path: `/trips/${trip.id}/plan`, query: { day: day?.id } }">
+              <NuxtLink class="aside hit" :to="{ path: `/trips/${trip.id}/plan`, query: { day: day?.id } }">
                 Full day
               </NuxtLink>
             </div>
@@ -362,7 +463,7 @@ const s = v.summary
                 :feedback="v.progress.value.feedback[st.id]"
                 :last="i === laterList.length - 1"
                 @open="sheet.open(st.id)"
-                @toggle="v.mark(st.id, today!.states[st.id] === 'done' ? null : 'done')"
+                @toggle="(e) => toggleDone(st, e)"
               />
             </ol>
             <p v-if="moreLater" class="small faint more">
@@ -403,6 +504,7 @@ const s = v.summary
 
           <section v-if="tally" class="card pad daycard">
             <ProgressRing
+              class="dc-ring"
               :size="92"
               :stroke="10"
               :total="tally.total"
@@ -414,19 +516,18 @@ const s = v.summary
             >
               <b class="num ringnum">{{ tally.done }}<small>/{{ tally.total }}</small></b>
             </ProgressRing>
-            <div class="grow stack tight">
+            <div class="stack tight dc-text">
               <b>Today so far</b>
-              <span class="small muted">{{ tally.done }} done · {{ tally.left }} to go<template v-if="tally.skipped">
-                · {{ tally.skipped }} skipped
-              </template></span>
-              <div class="row wrap">
-                <button class="btn xs" :class="alertsCtl.enabled.value ? 'gold' : 'ghost'" type="button" @click="alertsCtl.enabled.value ? alertsCtl.disable() : alertsCtl.enable()">
-                  <AppIcon name="bolt" size="xs" />{{ alertsCtl.enabled.value ? 'Leave reminders on' : 'Remind me when to leave' }}
-                </button>
-                <button v-if="wake.isSupported.value" class="btn xs" :class="wake.isActive.value ? 'gold' : 'ghost'" type="button" @click="wake.isActive.value ? wake.release() : wake.request('screen')">
-                  <AppIcon name="screen" size="xs" />{{ wake.isActive.value ? 'Screen stays on' : 'Keep screen on' }}
-                </button>
-              </div>
+              <span class="small muted parts"><span class="part">{{ tally.done }} done</span><span class="part"><span class="part-sep">&nbsp;·&nbsp;</span>{{ tally.left }} to go</span><span v-if="tally.skipped" class="part"><span class="part-sep">&nbsp;·&nbsp;</span>{{ tally.skipped }} skipped</span></span>
+              <span v-if="stampsToday" class="small dc-stamps"><AppIcon name="stamp" size="xs" />{{ stampCount(stampsToday) }} today</span>
+            </div>
+            <div class="dc-toggles">
+              <button class="btn xs" :class="alertsCtl.enabled.value ? 'gold' : 'ghost'" type="button" @click="alertsCtl.enabled.value ? alertsCtl.disable() : alertsCtl.enable()">
+                <AppIcon name="bolt" size="xs" />{{ alertsCtl.enabled.value ? 'Leave reminders on' : 'Remind me when to leave' }}
+              </button>
+              <button v-if="wake.isSupported.value" class="btn xs" :class="wake.isActive.value ? 'gold' : 'ghost'" type="button" @click="wake.isActive.value ? wake.release() : wake.request('screen')">
+                <AppIcon name="screen" size="xs" />{{ wake.isActive.value ? 'Screen stays on' : 'Keep screen on' }}
+              </button>
             </div>
           </section>
 
@@ -500,7 +601,7 @@ const s = v.summary
             </div>
             <div v-if="openBookings.length" class="rows book-rows">
               <label v-for="b in openBookings.slice(0, 6)" :key="b.id" class="row-item bk">
-                <input type="checkbox" class="check" :checked="false" @change="v.toggleBooking(b.id, true); toast('Nice, one less thing', { tone: 'ok', action: { label: 'Undo', run: () => v.toggleBooking(b.id, false) } })">
+                <input type="checkbox" class="check" :checked="false" :aria-label="`${b.title}: done`" @click="guardBox" @change="actions.tickBooking(b, true)">
                 <span class="grow">
                   <span class="bk-t">{{ b.title }}</span>
                   <span class="row wrap bk-m">
@@ -571,7 +672,9 @@ const s = v.summary
             {{ s.all.done }} done · {{ s.all.skipped }} skipped<template v-if="s.avgRating">
               · ★ {{ s.avgRating.toFixed(1) }}
             </template><template v-if="s.spent">
-              · {{ money(s.spent, trip.currency) }} spent
+              · {{ moneyExact(s.spent, trip.currency) }}&nbsp;spent
+            </template><template v-if="v.stamps.value.size">
+              · {{ stampCount(v.stamps.value.size) }}
             </template>
           </p>
           <div class="row wrap">
@@ -637,37 +740,77 @@ const s = v.summary
 .leg { display: flex; align-items: center; gap: 8px; }
 .acts { display: flex; gap: 8px; }
 .acts .btn.lg { min-height: 54px; }
+.acts .btn.icon { flex: none; }
+/* The narrowest phones: Done and Go share what the two 44 px icon buttons leave. */
+@media (max-width: 359px) {
+  .acts { gap: 6px; }
+  .acts .btn.lg:not(.icon) { flex: 1 1 0; min-width: 0; padding: 0 8px; gap: 6px; }
+}
 .mode-go.u-late .hero-body, .mode-go.u-now .hero-body { background: color-mix(in srgb, var(--bad-soft) 60%, var(--surface)); }
+
+/* money row */
+.money { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 6px; }
+.mn-link { flex: 1 1 auto; min-width: 0; min-height: 48px; display: flex; align-items: center; gap: 12px; padding: 4px 6px; border-radius: 12px; color: var(--fg); text-decoration: none; }
+.mn-link:hover { background: var(--surface-2); }
+.mn-ic { width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--gold-soft); color: var(--gold-ink); }
+.mn-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mn-l1 { font-size: 15px; line-height: 1.3; }
+.mn-l1 b { font-weight: 700; }
+.over { color: var(--warn); font-weight: 650; }
+.mn-add { flex: none; }
+
+/*
+ * Phrases joined by dots that wrap as wholes ("€37.00 today", "€134.50 left"): an amount never parts from its
+ * words, and a phrase that starts a line drops its dot, which then sits in the clipped strip on the left.
+ * The dot stays in the text for screen readers.
+ */
+.parts { display: flex; flex-wrap: wrap; margin-left: -.8em; clip-path: inset(-4px -4px -4px .8em); }
+.part { min-width: 0; padding-left: .8em; }
+.part-sep { display: inline-block; width: .8em; margin-left: -.8em; text-align: center; }
 
 /* next */
 .next { display: flex; align-items: center; gap: 12px; padding: 12px; }
-.thumb { width: 78px; height: 78px; border-radius: 14px; border: 0; padding: 0; flex: none; }
+.thumb { width: 72px; height: 72px; border-radius: 14px; border: 0; padding: 0; flex: none; }
 .nx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.nx-title { font-weight: 700; font-size: 16px; line-height: 1.25; text-align: left; background: none; border: 0; padding: 0; color: var(--fg); }
-.leave { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--fg-2); }
+.nx-head { display: flex; align-items: flex-start; gap: 8px; }
+.nx-h { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nx-title { align-self: flex-start; font-weight: 700; font-size: 16px; line-height: 1.25; text-align: left; background: none; border: 0; padding: 0; color: var(--fg); }
+/* The leave-by line: the reading face with even figures, on one line. */
+.leave { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--fg-2); white-space: nowrap; }
 .u-soon .leave { color: var(--warn); }
 .u-now .leave, .u-late .leave { color: var(--bad); }
 
 /* catch-up */
 .catch { overflow: hidden; }
 .catch-h { padding: 14px 16px 10px; }
-.catch .row-item { padding: 10px 14px; gap: 8px; }
+.catch .row-item { padding: 3px 14px; gap: 8px; }
 .tm { width: 42px; flex: none; }
 .link-like { background: none; border: 0; padding: 0; text-align: left; color: var(--fg); font-weight: 600; }
 .link-like:hover { color: var(--accent); }
+.catch .link-like { min-height: 44px; }
 
 .later .tl { padding: 6px 6px 6px 0; margin: 0; }
 .more { margin: 8px 4px 0; }
 
 /* map */
-.mapcard { position: relative; overflow: hidden; height: 300px; }
+/* Its own layer: the map's buttons (z-index 500) stay inside the card, under the header and the tab bar. */
+.mapcard { position: relative; overflow: hidden; height: 300px; isolation: isolate; }
 @media (min-width: 960px) { .mapcard { height: 380px; } }
 .map-ctl { position: absolute; right: 10px; bottom: 10px; z-index: 500; display: flex; gap: 8px; }
 .map-ctl .btn { box-shadow: var(--shadow); background: var(--surface); }
 .map-ctl .btn.primary { background: var(--accent); }
 .geo-err { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 500; padding: 8px 12px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 
-.daycard { display: flex; align-items: center; gap: 16px; }
+/* The toggles sit beside the ring, and under it on the narrowest phones so they never push the page sideways. */
+.daycard { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 16px; row-gap: 12px; }
+.dc-ring { grid-row: 1 / span 2; }
+.dc-text { grid-column: 2; }
+.dc-toggles { grid-column: 2; display: flex; flex-wrap: wrap; gap: 14px 8px; min-width: 0; }
+.dc-stamps { display: inline-flex; align-items: center; gap: 5px; color: var(--gold-ink); font-weight: 650; }
+@media (max-width: 380px) {
+  .dc-ring { grid-row: 1; }
+  .dc-toggles { grid-column: 1 / -1; }
+}
 .ringnum { font-size: 22px; }
 .ringnum small { font-size: 13px; color: var(--fg-3); }
 
@@ -693,8 +836,9 @@ const s = v.summary
 .bk-m { gap: 6px; margin-top: 5px; }
 .see-all { margin-top: 12px; }
 .packcard { display: flex; align-items: center; gap: 14px; }
-.mini-tl { list-style: none; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.mini-tl { list-style: none; margin: 6px 0 0; display: flex; flex-direction: column; }
 .mini-tl li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 14.5px; }
+.mini-tl .link-like { min-height: 44px; }
 .mini-tl li.minor { font-size: 13px; color: var(--fg-2); }
 .mini-tl li.minor .link-like { font-weight: 500; color: var(--fg-2); }
 .after-miss { display: flex; align-items: center; gap: 14px; }

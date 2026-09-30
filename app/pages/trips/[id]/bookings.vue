@@ -21,11 +21,16 @@ const groups = computed(() => {
   ].filter(g => g.items.length)
 })
 const s = computed(() => v.summary.value?.bookings ?? { total: 0, done: 0 })
+const actions = useTripActions()
 
+/** Ticks or unticks it; a tick says "Booked. One less thing." with "Log €25" when it has one price, and Undo. */
 function toggle(b: Booking) {
-  const was = !!v.progress.value.bookings[b.id]
-  v.toggleBooking(b.id)
-  if (!was) toast('Booked. One less thing.', { tone: 'ok', action: { label: 'Undo', run: () => v.toggleBooking(b.id, false) } })
+  actions.tickBooking(b)
+}
+/** A ticked booking moves to Done and the next slides into its place: the second tap of a double tap leaves it. */
+const tapOk = tapGuard()
+function guard(e: MouseEvent) {
+  if (!tapOk(e)) e.preventDefault()
 }
 </script>
 
@@ -59,7 +64,9 @@ function toggle(b: Booking) {
       <div class="list">
         <article v-for="b in g.items" :key="b.id" class="card bk" :class="{ done: g.key === 'done' }">
           <div class="bk-main">
-            <input type="checkbox" class="check" :checked="g.key === 'done'" :aria-label="`${b.title}: done`" @change="toggle(b)">
+            <label class="bk-check">
+              <input type="checkbox" class="check" :checked="g.key === 'done'" :aria-label="`${b.title}: done`" @click="guard" @change="toggle(b)">
+            </label>
             <button type="button" class="bk-txt" :aria-expanded="open === b.id" @click="open = open === b.id ? null : b.id">
               <span class="row wrap chips">
                 <span v-if="g.key !== 'done'" class="chip" :class="dueInfo(b, today).tone">{{ dueInfo(b, today).text }}</span>
@@ -113,7 +120,8 @@ function toggle(b: Booking) {
 .list { display: flex; flex-direction: column; gap: 10px; }
 .bk { overflow: hidden; }
 .bk-main { display: flex; align-items: flex-start; gap: 12px; padding: 14px; }
-.bk-main .check { margin-top: 2px; }
+/* A 44 px target around the 24 px box, drawn where the box was. */
+.bk-check { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -10px -12px -10px; cursor: pointer; }
 .bk-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; text-align: left; background: none; border: 0; padding: 0; color: var(--fg); }
 .chips { gap: 6px; }
 .bk-t { font-size: 15.5px; line-height: 1.35; }
