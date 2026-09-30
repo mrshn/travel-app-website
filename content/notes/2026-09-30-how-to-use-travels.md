@@ -8,7 +8,8 @@ tags: [app, how-to]
 
 ## On your phone
 
-- Open https://mrshn.github.io/travel-app-website/ and **Add to Home Screen**. It then opens full screen and works offline; map areas you've looked at stay cached.
+- Open https://travela-emre.firebaseapp.com and **Add to Home Screen**. It then opens full screen and works offline.
+- **Sign in with Google** (the prompt on the home screen, or Settings → Your account) so everything is kept in your account and on every device.
 - **Now** is the screen to keep open: the stop you should be at, time left, the next stop and when to leave. **Show me** turns on your location and the map follows you.
 - **Remind me when to leave** gives a nudge while the app is open; **Keep screen on** helps while walking.
 - **Preview** shows what the guide will say at any moment of the trip, so you can rehearse a day before it happens.
@@ -16,8 +17,16 @@ tags: [app, how-to]
 
 ## Your data
 
-- What you tick, rate and write stays on your phone. **Settings → Export everything** makes a backup file you can import on another device. Photos stay on the device they were added on.
+- Signed in, what you tick, rate, write and photograph is kept on the phone and in your Google account, and synced between your devices. Offline, it waits on the phone and syncs when you're back online.
+- Only your account can use the app: the first sign-in claims it.
+- **Settings → Export everything** still makes a backup file of your own.
 - The plans and these notes come from the GitHub repository, so they're the same on every device.
+- The old address (mrshn.github.io/travel-app-website) now points here. Sign in there once so what you logged there comes along.
+
+## Maps and times
+
+- Online, the map is Google Maps (switch in **Settings → Map**); offline it's the saved OpenStreetMap map.
+- "Leave by" uses Google's live walking and transit routes, including which metro or bus to catch. Without a connection it falls back to its own estimates.
 
 ## Saving chats with Claude
 

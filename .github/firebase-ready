@@ -1,0 +1,2 @@
+Google Cloud setup is done (scripts/setup-google-cloud.sh).
+While this file exists, the Deploy workflow also publishes to Firebase Hosting (https://travela-emre.firebaseapp.com).

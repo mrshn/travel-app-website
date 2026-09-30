@@ -19,5 +19,5 @@ export default defineAppConfig({
   /** The app's home on Firebase Hosting (sign-in works best there, including from the Home Screen). */
   appUrl: 'https://travela-emre.firebaseapp.com/',
   /** Set once Firebase Hosting is live, so the GitHub Pages copy points people there. */
-  firebaseLive: false,
+  firebaseLive: true,
 })
