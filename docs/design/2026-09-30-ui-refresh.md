@@ -1700,3 +1700,14 @@ Smaller changes, same review:
   turn one odd file into "photo backup isn't switched on" for the rest of the visit.)
 - **The celebrations a device showed go with its copy** (D39's device-only record is removed with the copy).
 - **The home's header** keeps its four buttons at 44 px on every phone; below 375 px the logo stands alone.
+
+**The owner's answers (30 Sep 2026):**
+
+- **D42 is confirmed:** another account's sign-in asks first when the device holds changes the remembered account
+  hasn't got yet.
+- **The Rome sample and notes stay as they are until after the trip.** The seeded Rome plan (with its hostel and
+  flight times) stays in the public repo and in "Try the sample trip", and the research and chat notes stay public on
+  GitHub (the app shows them only to accounts that hold the Rome trip, D43). After 12 October 2026, as one data change:
+  move the personal research and chat notes out of the public repo, and make the sample generic (no hostel name,
+  address or flight details). Not now, because any edit to the seeded trip shows "Update / Keep mine" on the owner's
+  phone the week before the trip.
