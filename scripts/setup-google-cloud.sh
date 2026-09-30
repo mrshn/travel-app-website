@@ -7,6 +7,11 @@
 # If the terminal isn't signed in to the Google account that owns the project, it asks you to sign in,
 # in a separate gcloud profile ("travels") so the account your other projects use stays as it is.
 # Safe to run again: every step skips what's already done.
+#
+# Answers can also be given up front (for running it from Claude Code or another tool, where nobody
+# can type into the prompts):
+#   TRAVELS_BILLING_ACCOUNT=<billing account id>   link this billing account (the Blaze plan), or "skip"
+#   TRAVELS_LOCK_SIGNUP=yes                        after your first sign-in: no other Google account may sign up
 set -o pipefail # (no -u: macOS still ships bash 3.2)
 
 P=travela-emre                                    # Firebase / Google Cloud project id
@@ -29,8 +34,10 @@ note() { printf '   %s%s%s\n' "$D" "$1" "$X"; }
 LEFT=()
 todo() { LEFT+=("$1"); printf '   %s!%s %s\n' "$Y" "$X" "$1"; }
 lastline() { tr -d '\r' | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-240; }
-# Asks on the terminal even though the script itself arrives through a pipe.
-ask() { REPLY=''; { printf '   %s ' "$1" >/dev/tty && read -r REPLY </dev/tty; } 2>/dev/null || REPLY=''; }
+# Someone is watching this terminal (not a tool capturing the output).
+interactive() { [ -t 1 ] && { : </dev/tty; } 2>/dev/null; }
+# Asks on the terminal even though the script itself arrives through a pipe; no answer when nobody can type.
+ask() { REPLY=''; interactive || return 0; { printf '   %s ' "$1" >/dev/tty && read -r REPLY </dev/tty; } 2>/dev/null || REPLY=''; }
 
 if ! command -v gcloud >/dev/null 2>&1; then
   echo "This needs the Google Cloud CLI (gcloud). Easiest: run the same line in Cloud Shell: https://shell.cloud.google.com/?show=terminal"
@@ -48,7 +55,7 @@ if ! can_open; then
   if ! can_open; then
     note "Sign in with the Google account that owns $P (the one you use in the Firebase console)."
     note "A browser window opens: pick that account and allow access, then come back here."
-    if { : </dev/tty; } 2>/dev/null; then gcloud auth login --brief </dev/tty; else gcloud auth login --brief; fi
+    if interactive; then gcloud auth login --brief </dev/tty; else gcloud auth login --brief </dev/null; fi
   fi
 fi
 if ! can_open; then
@@ -103,13 +110,21 @@ else
     done <<<"$LIST"
     note "Linking one puts $P on the Blaze plan (pay as you go). One person stays inside the free tiers,"
     note "and this script also adds an email alert and daily caps."
-    ask "Link which billing account? Type its number, or press Enter to skip:"
-    if [[ "$REPLY" =~ ^[0-9]+$ ]] && [ "$REPLY" -ge 1 ] && [ "$REPLY" -le "$i" ]; then
-      if OUT=$(gcloud billing projects link "$P" --billing-account="${IDS[$((REPLY - 1))]}" --quiet 2>&1); then
+    PICK=""
+    if [ -n "${TRAVELS_BILLING_ACCOUNT:-}" ]; then
+      [ "$TRAVELS_BILLING_ACCOUNT" != skip ] && PICK=$TRAVELS_BILLING_ACCOUNT
+    else
+      ask "Link which billing account? Type its number, or press Enter to skip:"
+      if [[ "$REPLY" =~ ^[0-9]+$ ]] && [ "$REPLY" -ge 1 ] && [ "$REPLY" -le "$i" ]; then PICK=${IDS[$((REPLY - 1))]}; fi
+    fi
+    if [ -n "$PICK" ]; then
+      if OUT=$(gcloud billing projects link "$P" --billing-account="$PICK" --quiet 2>&1); then
         ok "Linked: $P is on the Blaze plan"
       else
         todo "Could not link it: $(echo "$OUT" | lastline)"
       fi
+    elif [ -z "${TRAVELS_BILLING_ACCOUNT:-}" ] && ! interactive; then
+      todo "Billing not linked yet: run again with TRAVELS_BILLING_ACCOUNT=<one of the ids above> to link it."
     else
       todo "Billing skipped: photo backup stays off until you link a billing account (run this again)."
     fi
@@ -176,8 +191,11 @@ if echo "$CONF" | grep -q '"authorizedDomains"'; then
   if [ "$LOCKED" = "True" ]; then
     ok "Locked to your account (no new sign-ups)"
   elif [ "${USERS:-0}" -ge 1 ] 2>/dev/null; then
-    ask "You have signed in to the app. Lock it so no other Google account can sign up? [Y/n]"
-    if [[ ! "$REPLY" =~ ^[Nn] ]]; then
+    if [ -n "${TRAVELS_LOCK_SIGNUP:-}" ]; then REPLY=$TRAVELS_LOCK_SIGNUP
+    elif interactive; then ask "You have signed in to the app. Lock it so no other Google account can sign up? [Y/n]"
+    else REPLY=no; note "You've signed in to the app: run again with TRAVELS_LOCK_SIGNUP=yes to lock sign-up to your account."
+    fi
+    if [[ "$REPLY" =~ ^([Yy]|$) ]]; then
       api -X PATCH "https://identitytoolkit.googleapis.com/admin/v2/projects/$P/config?updateMask=client.permissions.disabledUserSignup" \
         -d '{"client": {"permissions": {"disabledUserSignup": true}}}' | grep -q 'disabledUserSignup' && ok "Locked to your account"
     fi
