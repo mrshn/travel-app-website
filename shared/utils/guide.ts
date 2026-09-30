@@ -52,9 +52,16 @@ const isOpen = (states: Record<string, StopState>, s: ResolvedStop) => {
   return st !== 'done' && st !== 'skipped'
 }
 
+/**
+ * Real travel times (e.g. from Google), or null to use the straight-line estimate.
+ * `arriveBy` is the stop's start, in minutes on the trip day's clock.
+ */
+export type TravelLookup = (from: LatLng, to: LatLng, meters: number, arriveBy: number) => TravelEstimate | null
+
 export interface GuideOptions {
   you?: LatLng | null
   home?: LatLng | null
+  travel?: TravelLookup
 }
 
 export function liveGuide(
@@ -102,10 +109,10 @@ export function liveGuide(
     // A transit step starts where you are: its place is where it takes you.
     if (dest && origin && next.kind !== 'move') {
       const meters = haversine(origin.p, dest)
-      g.leg = { from: origin.from, meters, est: travelEstimate(meters) }
+      g.leg = { from: origin.from, meters, est: opts.travel?.(origin.p, dest, meters, next.start) ?? travelEstimate(meters) }
     }
-    const travel = g.leg ? g.leg.est.minutes + LEAVE_BUFFER : 0
-    g.leaveBy = next.start - travel
+    const est = g.leg?.est
+    g.leaveBy = est ? (est.leaveBy ?? next.start - est.minutes) - LEAVE_BUFFER : next.start
     g.leaveIn = g.leaveBy - minutes
     g.urgency = g.leaveIn < 0 ? 'late' : g.leaveIn <= 5 ? 'now' : g.leaveIn <= 20 ? 'soon' : 'relaxed'
   }
@@ -121,7 +128,8 @@ export function liveGuide(
 
   if (opts.you && g.focus?.place) {
     const meters = haversine(opts.you, g.focus.place)
-    g.focusLeg = { from: 'you', meters, est: travelEstimate(meters) }
+    const same = g.focus === next && g.leg?.from === 'you'
+    g.focusLeg = { from: 'you', meters, est: same ? g.leg!.est : (opts.travel?.(opts.you, g.focus.place, meters, g.focus.start) ?? travelEstimate(meters)) }
   }
   return g
 }

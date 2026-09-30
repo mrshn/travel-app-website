@@ -1,0 +1,50 @@
+name: Cloud sync tests
+
+# Sign-in, sync between two "devices", photo backup and the security rules,
+# against the Firebase emulators (nothing touches the real project).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'shared/**'
+      - 'firebase/**'
+      - 'firebase.json'
+      - 'tests/e2e/**'
+      - 'package-lock.json'
+      - '.github/workflows/cloud-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # The Firestore and Storage emulators run on Java.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - name: Install a browser
+        run: npm i --no-save playwright@1 && npx playwright install --with-deps chromium
+
+      - name: Build the app against the emulators
+        run: npm run generate
+        env:
+          NUXT_PUBLIC_FIREBASE_EMULATORS: 127.0.0.1
+
+      - name: Run the sync tests
+        run: npx -y firebase-tools@15 emulators:exec --only auth,firestore,storage --project travela-emre "node tests/e2e/cloud.e2e.mjs"

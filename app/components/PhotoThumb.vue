@@ -2,10 +2,12 @@
 const props = defineProps<{ id: string, removable?: boolean }>()
 const emit = defineEmits<{ remove: [] }>()
 const { url } = usePhotos()
+const cloud = useCloud()
 const src = ref<string | null>(null)
 const big = ref(false)
-watch(() => props.id, async (id) => {
-  src.value = await url(id)
+// Tries again once you're signed in (the photo may have been taken on another device).
+watch([() => props.id, cloud.photoEpoch], async ([id], old) => {
+  if (!src.value || id !== old?.[0]) src.value = await url(id)
 }, { immediate: true })
 </script>
 

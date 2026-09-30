@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bearing, compass, directionsUrl, fmtDistance, haversine, parseLatLng, travelEstimate, walkMinutes } from '../shared/utils/geo'
+import { bearing, compass, decodePolyline, directionsUrl, fmtDistance, haversine, parseLatLng, travelEstimate, walkMinutes } from '../shared/utils/geo'
 
 const colosseum = { lat: 41.8902, lng: 12.4922 }
 const pantheon = { lat: 41.8986, lng: 12.4769 }
@@ -41,5 +41,13 @@ describe('geo', () => {
 
   it('builds directions links', () => {
     expect(directionsUrl(pantheon, 'transit')).toBe('https://www.google.com/maps/dir/?api=1&destination=41.8986%2C12.4769&travelmode=transit')
+  })
+})
+
+describe('Google polylines', () => {
+  it('decodes the documented example', () => {
+    // From Google's "Encoded Polyline Algorithm Format" page.
+    expect(decodePolyline('_p~iF~ps|U_ulLnnqC_mqNvxq`@')).toEqual([[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]])
+    expect(decodePolyline('')).toEqual([])
   })
 })

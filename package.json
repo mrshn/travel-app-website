@@ -20,6 +20,7 @@
     "@vite-pwa/nuxt": "^1.1.1",
     "@vueuse/core": "^15.0.0",
     "@vueuse/nuxt": "^15.0.0",
+    "firebase": "^12.19.0",
     "idb-keyval": "^6.3.0",
     "leaflet": "^1.9.4",
     "marked": "^18.0.14",

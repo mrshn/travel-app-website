@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-09-01',
   ssr: false,
   devtools: { enabled: false },
+  runtimeConfig: {
+    public: {
+      // Set NUXT_PUBLIC_FIREBASE_EMULATORS=127.0.0.1 when building to use local Firebase emulators (tests).
+      firebaseEmulators: '',
+    },
+  },
   modules: ['@vueuse/nuxt', '@vite-pwa/nuxt'],
   css: [
     // Fonts are bundled with the app (no Google requests, and they work offline).

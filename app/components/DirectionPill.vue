@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { bearing, compass, fmtDistance, haversine, travelEstimate, type LatLng } from '#shared/utils/geo'
+import { bearing, compass, fmtDistance, haversine, travelEstimate, type LatLng, type TravelEstimate } from '#shared/utils/geo'
 
-const props = defineProps<{ from: LatLng, to: LatLng, heading?: number | null, name?: string, onArt?: boolean }>()
+const props = defineProps<{ from: LatLng, to: LatLng, heading?: number | null, name?: string, onArt?: boolean, est?: TravelEstimate }>()
 const meters = computed(() => haversine(props.from, props.to))
-const est = computed(() => travelEstimate(meters.value))
+const est = computed(() => props.est ?? travelEstimate(meters.value))
 const b = computed(() => bearing(props.from, props.to))
 const rot = computed(() => (props.heading === null || props.heading === undefined ? b.value : b.value - props.heading))
 const here = computed(() => meters.value < ARRIVED_M)
@@ -18,7 +18,7 @@ const here = computed(() => meters.value < ARRIVED_M)
       <template v-if="here"><b>You're here</b><span class="sub">{{ name ? `at ${name}` : 'within a few steps' }}</span></template>
       <template v-else>
         <b class="num">{{ fmtDistance(meters) }} <span class="cmp">{{ heading === null || heading === undefined ? compass(b) : '' }}</span></b>
-        <span class="sub">~{{ est.minutes }} min {{ est.mode === 'walk' ? 'walk' : 'by transit' }}{{ name ? ` to ${name}` : '' }}</span>
+        <span class="sub">{{ est.source === 'google' ? '' : '~' }}{{ est.minutes }} min {{ est.mode === 'walk' ? 'walk' : 'by transit' }}{{ name ? ` to ${name}` : '' }}</span>
       </template>
     </span>
   </div>

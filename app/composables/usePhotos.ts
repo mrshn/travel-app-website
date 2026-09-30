@@ -1,9 +1,6 @@
-import { createStore, del, get, set } from 'idb-keyval'
 import { uid } from '#shared/utils/plan'
+import { deletePhoto, readPhoto, writePhoto } from '~/lib/photoStore'
 
-/** Photos live in this browser's IndexedDB (they're too big for localStorage). */
-let store: ReturnType<typeof createStore> | null = null
-const db = () => (store ??= createStore('travels-photos', 'photos'))
 const urls = new Map<string, string>()
 
 async function shrink(file: Blob, max = 1600, quality = 0.82): Promise<Blob> {
@@ -26,26 +23,38 @@ async function shrink(file: Blob, max = 1600, quality = 0.82): Promise<Blob> {
   }
 }
 
+/** Photos are kept on this device and, when you're signed in, backed up to your account. */
 export function usePhotos() {
+  const cloud = useCloud()
+
   async function add(file: Blob): Promise<string> {
     const blob = await shrink(file)
     const id = uid('ph')
-    await set(id, blob, db())
+    await writePhoto(id, blob)
+    cloud.photoAdded(id)
     return id
   }
 
+  /** A URL to show the photo, fetching it from your account when it was taken on another device. */
   async function url(id: string): Promise<string | null> {
     const hit = urls.get(id)
     if (hit) return hit
-    const blob = await get<Blob>(id, db())
-    if (!blob) return null
+    let blob = await readPhoto(id)
+    if (!blob) {
+      const got = await cloud.fetchPhoto(id)
+      if (!got) return null
+      if (typeof got === 'string') return got
+      blob = got
+      await writePhoto(id, blob).catch(() => {})
+    }
     const u = URL.createObjectURL(blob)
     urls.set(id, u)
     return u
   }
 
   async function remove(id: string) {
-    await del(id, db())
+    await deletePhoto(id)
+    cloud.photoRemoved(id)
     const u = urls.get(id)
     if (u) URL.revokeObjectURL(u)
     urls.delete(id)

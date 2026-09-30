@@ -8,6 +8,13 @@ const store = useProgressStore()
 const { now } = useClock()
 const { choice } = useTheme()
 const { $pwa } = useNuxtApp()
+const config = useAppConfig()
+const cloud = useCloud()
+const nudgeOff = useLocalStorage('travel:nudge:signin', false)
+const showNudge = computed(() => !cloud.user.value && (cloud.status.value === 'off' || cloud.status.value === 'signed-out') && !nudgeOff.value && !moved.value)
+// The GitHub Pages copy points to the app's home on Firebase once that's live.
+const moved = computed(() => config.firebaseLive && typeof location !== 'undefined' && location.hostname.endsWith('github.io'))
+const syncDot = computed(() => ({ synced: 'ok', syncing: 'busy', offline: 'warn', error: 'bad', 'not-owner': 'bad' } as Record<string, string>)[cloud.status.value] ?? '')
 const notesStore = useNotes()
 notesStore.load()
 const latestNotes = computed(() => notesStore.notes.value.slice(0, 3))
@@ -78,11 +85,35 @@ useHead({ title: 'Travels' })
         <button class="btn icon plain round" type="button" :aria-label="`Theme: ${choice}`" @click="cycleTheme">
           <AppIcon :name="themeIcon" />
         </button>
+        <NuxtLink v-if="cloud.user.value" to="/settings#account" class="btn icon plain round acct" :aria-label="`Account: ${cloud.status.value}`">
+          <img v-if="cloud.user.value.photo" :src="cloud.user.value.photo" alt="" referrerpolicy="no-referrer">
+          <AppIcon v-else name="person" />
+          <i v-if="syncDot" class="dot" :class="syncDot" />
+        </NuxtLink>
         <NuxtLink to="/settings" class="btn icon plain round" aria-label="Settings and backups">
           <AppIcon name="sliders" />
         </NuxtLink>
       </div>
     </header>
+
+    <div v-if="moved" class="card pad stack movedcard">
+      <b class="h3">Travels has a new home</b>
+      <p class="small muted">
+        It now lives at {{ config.appUrl.replace('https://', '').replace(/\/$/, '') }}, with Google sign-in, sync and photo backup.
+        <template v-if="!cloud.user.value">
+          To bring what you logged here, sign in here once first, then open the new address and sign in there.
+        </template>
+        <template v-else>
+          What you logged here is in your account; sign in at the new address to see it there.
+        </template>
+      </p>
+      <div class="row wrap">
+        <a class="btn primary sm" :href="config.appUrl">Open the new address<AppIcon name="ext" size="sm" /></a>
+        <button v-if="!cloud.user.value" class="btn ghost sm" type="button" @click="cloud.signIn()">
+          <AppIcon name="person" size="sm" />Sign in here first
+        </button>
+      </div>
+    </div>
 
     <div class="hello">
       <p class="kicker">
@@ -103,6 +134,22 @@ useHead({ title: 'Travels' })
         <span class="btn gold sm go">Open the live guide<AppIcon name="arrow" size="sm" /></span>
       </div>
     </NuxtLink>
+
+    <div v-if="showNudge && cards.length" class="card pad nudge">
+      <AppIcon name="cloud" class="nic" />
+      <div class="stack tight grow1">
+        <b>Keep your trips safe</b>
+        <span class="small muted">Sign in with Google to back up your trips, ticks, notes and photos, and to have them on any device.</span>
+        <div class="row wrap">
+          <button class="btn primary sm" type="button" @click="cloud.signIn()">
+            <AppIcon name="person" size="sm" />Sign in with Google
+          </button>
+          <button class="btn plain sm" type="button" @click="nudgeOff = true">
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="totals.trips" class="stats card">
       <div><b class="num">{{ totals.trips }}</b><span>{{ totals.trips === 1 ? 'trip' : 'trips' }}</span></div>
@@ -175,6 +222,17 @@ useHead({ title: 'Travels' })
 
 <style scoped>
 .home { padding-bottom: 48px; }
+.acct { position: relative; }
+.acct img { width: 28px; height: 28px; border-radius: 999px; object-fit: cover; }
+.acct .dot { position: absolute; right: 7px; bottom: 7px; width: 10px; height: 10px; border-radius: 999px; border: 2px solid var(--bg); background: var(--fg-3); }
+.acct .dot.ok { background: var(--ok); }
+.acct .dot.warn { background: var(--warn); }
+.acct .dot.bad { background: var(--bad); }
+.acct .dot.busy { background: var(--gold); }
+.movedcard { margin: 8px 0 12px; border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.nudge { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.nudge .nic { color: var(--accent); flex: none; margin-top: 2px; }
+.grow1 { flex: 1; min-width: 0; }
 .home-top { display: flex; align-items: center; justify-content: space-between; padding: calc(4px + var(--safe-t)) 0 8px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--accent); }
 .brand b { font-size: 19px; letter-spacing: .24em; text-transform: uppercase; }

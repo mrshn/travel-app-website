@@ -46,11 +46,14 @@ It ships with a full 5-day plan for **Rome, 8–12 October 2026** (first trip ab
   <img src="docs/screenshots/home.webp" width="240" alt="All trips">
 </p>
 
-## Privacy and offline
+## Your account, sync and offline
 
-- There is no server and no account. Trips and progress are stored in your browser (`localStorage`); photos in IndexedDB. Nothing leaves your phone except map-tile requests to CARTO and the Google Maps links you tap.
-- It's an installable PWA: add it to your home screen and it opens full screen and works offline. Map areas you've viewed are cached for when you have no signal.
-- **Back up** from *Settings → Export everything* and import the file on another device. Photos stay on the device they were added on.
+- **Works without an account.** Trips and progress live on the device (`localStorage`), photos in IndexedDB, and everything works offline.
+- **Sign in with Google** (*Settings → Your account*) to keep a copy in your own Firebase project: trips and progress in Firestore, photos in Cloud Storage. Every device you sign in on stays in step; changes made offline sync when you're back online, and edits made on two devices are merged (ticks, ratings, notes and photos from both are kept).
+- **Only you.** The first Google account that signs in owns the app; the security rules (`firebase/`) refuse every other account. The setup script can also lock sign-up to your account.
+- **Google Maps**: the map uses Google's tiles (Map Tiles API) and the live guide asks Google (Routes API) for real walking and transit times, including which metro or bus to catch for "leave by". Offline, the map falls back to the saved OpenStreetMap tiles and the guide to its own estimates. You can switch the map in *Settings → Map*.
+- It's an installable PWA: add it to your home screen and it opens full screen.
+- **Back up** from *Settings → Export everything* if you want a file of your own.
 
 ## Saving chats and trips from Claude
 
@@ -71,7 +74,7 @@ npm run typecheck
 npm run generate   # static site in .output/public
 ```
 
-Stack: Nuxt 4 (client-side SPA, static generation), Vue 3, VueUse, Leaflet with OpenStreetMap/CARTO tiles, idb-keyval, `@vite-pwa/nuxt`, Vitest. The illustrations are original hand-coded SVG, lit for the time of day.
+Stack: Nuxt 4 (client-side SPA, static generation), Vue 3, VueUse, Leaflet with Google Map Tiles or OpenStreetMap/CARTO tiles, Firebase (Auth, Firestore, Storage, Hosting), Google Routes API, idb-keyval, `@vite-pwa/nuxt`, Vitest, Playwright. The illustrations are original hand-coded SVG, lit for the time of day.
 
 ### Project layout
 
@@ -80,14 +83,19 @@ app/
   pages/            index (all trips), trips/new, settings,
                     trips/[id]/{now,plan,map,progress,more,bookings,packing,places,guide,sos,settings}
   components/       MapView (Leaflet), StopSheet, StopEditor, FeedbackEditor, DayStrip, …
-  composables/      useTrips, useProgress, useTripView, useClock, useGeo, useLiveAlerts, usePhotos, …
+  composables/      useTrips, useProgress, useTripView, useClock, useGeo, useLiveAlerts, usePhotos,
+                    useCloud (sign-in and sync), useGoogleMaps (tiles and routes), …
+  lib/firebase.ts   Firebase, loaded only once you sign in
   data/trips.ts     the trips that ship with the app (rome.ts is the Rome plan)
   data/notes.ts     loads content/notes/*.md
   utils/            illustration engine, icons, map helpers, UI helpers
 shared/
   types/trip.ts     the data model
-  utils/            time (trip clock, time zones), geo, plan (states, progress), guide (live guide), text
-tests/              Vitest (including checks of every trip's data)
+  utils/            time (trip clock, time zones), geo, plan (states, progress), guide (live guide), text,
+                    sync (what to upload, download or merge)
+tests/              Vitest (including checks of every trip's data); e2e/ runs against the Firebase emulators
+firebase/           Firestore and Storage security rules
+scripts/            one-time Google Cloud setup
 content/notes/      notes and chat logs (Markdown)
 public/archive/     standalone pages kept as they were
 docs/               content guide and screenshots
@@ -97,11 +105,25 @@ docs/               content guide and screenshots
 
 Create `app/data/<trip>.ts` exporting a `Trip` (see `shared/types/trip.ts`; `app/data/rome.ts` is a complete example) and add it to `SEED_TRIPS` in `app/data/trips.ts`. See [docs/content-guide.md](docs/content-guide.md). Seeded trips follow newer versions pushed here, and can be reset to the original from *Trip settings*.
 
-## Deploy (GitHub Pages)
+## Deploy
 
-The workflow in `.github/workflows/deploy.yml` tests, builds and publishes the site on every push to `main`.
-One-time setup: in the repository go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
+The workflow in `.github/workflows/deploy.yml` tests and builds on every push to `main`, then publishes:
+
+- **Firebase Hosting** (the app's home, with sign-in and sync): https://travela-emre.firebaseapp.com. GitHub signs in to Google without any stored key (Workload Identity Federation) and deploys the site plus the Firestore and Storage security rules. This job runs once `.github/firebase-ready` exists.
+- **GitHub Pages**: https://mrshn.github.io/travel-app-website/, a copy that points to the Firebase address once it's live (`firebaseLive` in `app/app.config.ts`).
+
+`.github/workflows/cloud-tests.yml` runs sign-in, two-device sync, offline merging, photo backup and the security rules against the Firebase emulators.
+
+### One-time Google Cloud setup
+
+Run this in a terminal (your computer's, or Cloud Shell) and follow the prompts:
+
+```bash
+curl -sL https://raw.githubusercontent.com/mrshn/travel-app-website/main/scripts/setup-google-cloud.sh | bash
+```
+
+It signs you in with the Google account that owns the Firebase project (in its own gcloud profile), asks before linking a billing account (the Blaze plan, needed for photo storage and Google Maps; one person stays inside the free tiers), turns on Google sign-in, creates the database, the hosting site and the photo bucket, lets only this repository deploy, locks the Maps key to the app's addresses with daily caps, and adds a spending alert. Safe to run again.
 
 ## Credits
 
-Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, map tiles © [CARTO](https://carto.com/attributions). Fonts: Cinzel, Instrument Sans and IBM Plex Mono (SIL Open Font License), bundled via Fontsource. Trip facts were researched in September 2026; check opening times and rules before you go.
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, map tiles © [CARTO](https://carto.com/attributions); Google Maps tiles and routes © Google. Fonts: Cinzel, Instrument Sans and IBM Plex Mono (SIL Open Font License), bundled via Fontsource. Trip facts were researched in September 2026; check opening times and rules before you go.

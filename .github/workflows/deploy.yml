@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -54,3 +54,57 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # The app's real home: Firebase Hosting (with sign-in, sync and the security rules).
+  # Runs once the one-time setup (scripts/setup-google-cloud.sh) is done and .github/firebase-ready exists.
+  firebase:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Is Firebase set up?
+        id: gate
+        run: |
+          if [ -f .github/firebase-ready ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Firebase deploy skipped: run scripts/setup-google-cloud.sh, then add .github/firebase-ready." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - if: steps.gate.outputs.ready == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - if: steps.gate.outputs.ready == 'true'
+        run: npm ci
+
+      - if: steps.gate.outputs.ready == 'true'
+        name: Build the static site for Firebase Hosting
+        run: npm run generate
+        env:
+          NUXT_APP_BASE_URL: /
+
+      # Keyless: GitHub proves it's this repository, Google lets it act as the deploy account.
+      - if: steps.gate.outputs.ready == 'true'
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: travela-emre
+          workload_identity_provider: projects/954018683436/locations/global/workloadIdentityPools/github/providers/github-repo
+          service_account: github-deploy@travela-emre.iam.gserviceaccount.com
+
+      - if: steps.gate.outputs.ready == 'true'
+        name: Deploy the site and the database rules
+        run: npx -y firebase-tools@15 deploy --only hosting,firestore:rules --project travela-emre --non-interactive
+
+      - if: steps.gate.outputs.ready == 'true'
+        name: Deploy the photo storage rules
+        # Photo storage needs the Blaze plan; the rest works without it.
+        continue-on-error: true
+        run: npx -y firebase-tools@15 deploy --only storage --project travela-emre --non-interactive

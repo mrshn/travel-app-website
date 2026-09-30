@@ -3,6 +3,14 @@ import type { Trip, TripProgress } from '#shared/types/trip'
 
 const trips = useTrips()
 const store = useProgressStore()
+const cloud = useCloud()
+const gmaps = useGoogleMaps()
+const mapNote = computed(() => {
+  if (!gmaps.key) return 'Google Maps isn’t set up in this copy of the app.'
+  if (gmaps.provider.value === 'osm') return 'A clean map that’s saved for offline use as you look around. Leave-by times still come from Google when you’re online.'
+  if (gmaps.tilesWork.value === false) return 'Google Maps isn’t answering yet (the key needs the Map Tiles API and billing), so the OpenStreetMap map shows instead.'
+  return 'Shops, restaurants and transit from Google, with real walking and transit times for “leave by”. Offline, the map switches to the saved OpenStreetMap tiles.'
+})
 const { choice } = useTheme()
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -56,8 +64,12 @@ function restore(id: string) {
   if (t) toast(`${t.title} is back`, { tone: 'ok' })
 }
 
-function wipe() {
-  if (!confirm('Delete all trips and everything you logged on this device?')) return
+async function wipe() {
+  const signedIn = !!cloud.user.value
+  if (!confirm(signedIn
+    ? 'Delete all trips and everything you logged on this device? You\'ll be signed out; your Google account keeps its copy.'
+    : 'Delete all trips and everything you logged on this device?')) return
+  if (signedIn) await cloud.forget()
   trips.replaceAll([])
   store.value = {}
   toast('All data deleted')
@@ -75,6 +87,8 @@ useHead({ title: 'Settings · Travels' })
         Settings
       </h1>
     </header>
+
+    <AccountCard />
 
     <section class="card pad stack">
       <h2 class="h3">
@@ -95,10 +109,30 @@ useHead({ title: 'Settings · Travels' })
 
     <section class="card pad stack">
       <h2 class="h3">
+        Map
+      </h2>
+      <div class="seg">
+        <button type="button" :aria-pressed="gmaps.provider.value === 'google'" @click="gmaps.provider.value = 'google'">
+          <AppIcon name="map" size="sm" />Google Maps
+        </button>
+        <button type="button" :aria-pressed="gmaps.provider.value === 'osm'" @click="gmaps.provider.value = 'osm'">
+          <AppIcon name="layers" size="sm" />OpenStreetMap
+        </button>
+      </div>
+      <p class="small muted">
+        {{ mapNote }}
+      </p>
+    </section>
+
+    <section class="card pad stack">
+      <h2 class="h3">
         Backup
       </h2>
-      <p class="small muted">
-        Your trips, ticks, ratings and notes are stored in this browser only. Export a backup file to keep them safe or move them to another device, then import it there. Photos stay on the device they were taken on.
+      <p v-if="cloud.user.value" class="small muted">
+        Everything is also kept in your Google account (above). A backup file is still handy as an extra copy you keep yourself.
+      </p>
+      <p v-else class="small muted">
+        Your trips, ticks, ratings and notes are stored in this browser only. Sign in above to keep them in your account, or export a backup file and import it on another device. Photos stay on the device they were taken on.
       </p>
       <div class="row wrap">
         <button class="btn primary" type="button" @click="exportAll">
@@ -128,7 +162,7 @@ useHead({ title: 'Settings · Travels' })
         Use it like an app
       </h2>
       <p class="small muted">
-        Add Travels to your home screen (Share → Add to Home Screen on iPhone, or the install prompt in Chrome). It then opens full screen and works offline; map areas you've looked at stay cached for when you have no signal.
+        Add Travels to your home screen (Share → Add to Home Screen on iPhone, or the install prompt in Chrome). It then opens full screen and works offline; OpenStreetMap areas you've looked at stay saved for when you have no signal.
       </p>
     </section>
 

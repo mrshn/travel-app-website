@@ -84,7 +84,11 @@ export const ICONS: Record<string, string> = {
  "sunrise": "<path d=\"M17 18a5 5 0 0 0-10 0M12 9V2M4.2 10.2l1.4 1.4M1 18h2M21 18h2M18.4 11.6l1.4-1.4M23 22H1M8 5.5l4-4 4 4\"/>",
  "lock": "<rect x=\"5\" y=\"10.5\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 10.5V7.5a4 4 0 0 1 8 0v3\"/>",
  "bolt": "<path d=\"M13 2.5L4.5 13.5H12l-1 8 8.5-11H12z\"/>",
- "hourglass": "<path d=\"M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9\"/>"
+ "hourglass": "<path d=\"M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9\"/>",
+ "cloud": "<path d=\"M7 19h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.4 10.2 4.5 4.5 0 0 0 7 19z\"/>",
+ "cloudok": "<path d=\"M7 19h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.4 10.2 4.5 4.5 0 0 0 7 19z\"/><path d=\"M9.4 14.3l1.9 1.9 3.5-3.6\"/>",
+ "cloudoff": "<path d=\"M7 19h10.5M20.6 17.4a4 4 0 0 0-2.5-6.35A6 6 0 0 0 9.3 6.1M6.4 10.2A4.5 4.5 0 0 0 7 19M3 3l18 18\"/>",
+ "logout": "<path d=\"M14.5 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3.5M10 16.5 14.5 12 10 7.5M14.5 12H4\"/>"
 }
 
 /** Names used in trip data that map to another icon. */

@@ -53,8 +53,17 @@ const emit = defineEmits<{
 
 const el = ref<HTMLElement | null>(null)
 const { dark } = useTheme()
+const gmaps = useGoogleMaps()
+const online = useOnline()
 let map: L.Map | null = null
 let tiles: L.TileLayer | null = null
+/** Which base map is showing: Google's tiles, or OpenStreetMap/CARTO (also the offline fallback). */
+const base = ref<'google' | 'osm'>('osm')
+let attr = ''
+let baseUrl = ''
+let tileErrors = 0
+let tileResets = 0
+let baseSeq = 0
 let metroLayer: L.LayerGroup | null = null
 let lineLayer: L.LayerGroup | null = null
 let markerLayer: L.LayerGroup | null = null
@@ -66,6 +75,56 @@ let programmatic = false
 
 const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
 const tileUrl = () => `https://{s}.basemaps.cartocdn.com/${dark.value ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png`
+
+function setAttribution(text: string) {
+  const c = map?.attributionControl
+  if (!c || text === attr) return
+  if (attr) c.removeAttribution(attr)
+  attr = text
+  if (text) c.addAttribution(text)
+}
+
+/** Puts Google's map underneath when it's picked, online and working; OpenStreetMap otherwise. */
+async function setBase() {
+  if (!map) return
+  const seq = ++baseSeq
+  const theme = dark.value ? 'dark' : 'light'
+  const token = gmaps.useGoogleTiles.value && online.value ? await gmaps.session(theme) : null
+  if (!map || seq !== baseSeq) return
+  const want = token ? 'google' : 'osm'
+  const url = token ? gmaps.tileUrl(token) : tileUrl()
+  if (tiles && baseUrl === url) return
+  tiles?.remove()
+  tileErrors = 0
+  baseUrl = url
+  if (token) {
+    tiles = L.tileLayer(url, { maxZoom: 21, detectRetina: false })
+    tiles.on('tileerror', () => {
+      if (++tileErrors !== 6 || !online.value) return
+      // A stale session gets one fresh start; after that, use the other map for now.
+      if (tileResets++ < 1) gmaps.resetTiles()
+      else gmaps.tilesWork.value = false
+      void setBase()
+    })
+    tiles.on('load', () => (tileErrors = 0))
+    setAttribution('Google Maps')
+  }
+  else {
+    tiles = L.tileLayer(url, { subdomains: 'abcd', maxZoom: 20, detectRetina: false })
+    setAttribution(ATTR)
+  }
+  base.value = want
+  tiles.addTo(map).bringToBack()
+  if (token) void updateCopyright()
+}
+
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+async function updateCopyright() {
+  if (!map || base.value !== 'google') return
+  const b = map.getBounds()
+  const text = await gmaps.copyright(dark.value ? 'dark' : 'light', { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }, map.getZoom())
+  if (base.value === 'google') setAttribution(`Google Maps${text ? ` · ${esc(text)}` : ''}`)
+}
 
 function cssColor(c: string | undefined, fallback = '--accent'): string {
   const v = c ?? fallback
@@ -197,7 +256,17 @@ onMounted(() => {
   map = L.map(el.value, { zoomControl: false, attributionControl: true, tapHold: false } as L.MapOptions)
   map.attributionControl.setPrefix(false)
   if (props.zoomControl) L.control.zoom({ position: 'bottomright' }).addTo(map)
-  tiles = L.tileLayer(tileUrl(), { attribution: ATTR, subdomains: 'abcd', maxZoom: 20, detectRetina: false }).addTo(map)
+  // Start on the saved OpenStreetMap tiles unless Google's map is about to take over.
+  if (!(gmaps.useGoogleTiles.value && online.value)) {
+    baseUrl = tileUrl()
+    tiles = L.tileLayer(baseUrl, { subdomains: 'abcd', maxZoom: 20, detectRetina: false }).addTo(map)
+    setAttribution(ATTR)
+  }
+  void setBase()
+  map.on('moveend', () => {
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => void updateCopyright(), 700)
+  })
   metroLayer = L.layerGroup().addTo(map)
   lineLayer = L.layerGroup().addTo(map)
   markerLayer = L.layerGroup().addTo(map)
@@ -220,6 +289,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(copyTimer)
+  baseSeq++
   ro?.disconnect()
   map?.remove()
   map = null
@@ -237,8 +308,8 @@ watch(() => props.follow, (v) => {
   if (v) centerOnYou()
 })
 watch(() => props.fitKey, () => nextTick(fit))
+watch([dark, online, gmaps.useGoogleTiles], () => void setBase())
 watch(dark, () => {
-  tiles?.setUrl(tileUrl())
   drawLines()
   if (youCircle) youCircle.setStyle({ color: cssColor('--you') })
 })

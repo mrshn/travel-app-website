@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { romeTrip } from '../app/data/rome'
 import { activeVariant, dayViews, emptyProgress, findStop, planDays, resolveStop, resolveStops, stopStates, summarize } from '../shared/utils/plan'
-import { liveGuide } from '../shared/utils/guide'
+import { LEAVE_BUFFER, liveGuide } from '../shared/utils/guide'
 import { tripMoment } from '../shared/utils/time'
 import type { Stop, Trip } from '../shared/types/trip'
 
@@ -139,6 +139,28 @@ describe('live guide', () => {
     const g = liveGuide(plan.stops, plan.states, m.minutes, { you })
     expect(g.leg?.from).toBe('you')
     expect(g.focusLeg?.meters).toBeGreaterThan(300)
+  })
+
+  it('uses real travel times when it has them', () => {
+    const { m, plan } = plans('2026-10-11T07:00:00Z') // 09:00 Sunday, next: Porta Portese at 10:00
+    const asked: number[] = []
+    const g = liveGuide(plan.stops, plan.states, m.minutes, {
+      home: trip.home,
+      travel: (_from, _to, _meters, arriveBy) => {
+        asked.push(arriveBy)
+        return { mode: 'transit', minutes: 31, leaveBy: 562, source: 'google', ride: 'Tram 8 09:26 from Arenula' }
+      },
+    })
+    expect(asked[0]).toBe(g.next!.start)
+    expect(g.leg?.est.source).toBe('google')
+    // Leave to catch the ride, with the usual few minutes of slack.
+    expect(g.leaveBy).toBe(562 - LEAVE_BUFFER)
+    // Without a set departure, it counts back from the start.
+    const w = liveGuide(plan.stops, plan.states, m.minutes, { home: trip.home, travel: () => ({ mode: 'walk', minutes: 20, source: 'google' }) })
+    expect(w.leaveBy).toBe(w.next!.start - 20 - LEAVE_BUFFER)
+    // No answer: back to the estimate.
+    const e = liveGuide(plan.stops, plan.states, m.minutes, { home: trip.home, travel: () => null })
+    expect(e.leg?.est.source).toBeUndefined()
   })
 
   it('starts the day from home', () => {

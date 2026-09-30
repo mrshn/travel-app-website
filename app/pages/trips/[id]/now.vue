@@ -32,8 +32,11 @@ const today = v.today
 const day = computed(() => today.value?.view.day)
 const minutes = computed(() => m.value?.minutes ?? 0)
 const you = computed<LatLng | null>(() => (geo.fix.value ? { lat: geo.fix.value.lat, lng: geo.fix.value.lng } : null))
+const gmaps = useGoogleMaps()
+// Real walking and transit times from Google (not while previewing another moment).
+const travel = computed(() => (trip.value && day.value && !v.clock.previewing.value ? gmaps.lookupFor(trip.value.timezone, day.value.date) : undefined))
 const guide = computed(() =>
-  today.value ? liveGuide(today.value.stops, today.value.states, minutes.value, { you: you.value, home: trip.value?.home }) : null,
+  today.value ? liveGuide(today.value.stops, today.value.states, minutes.value, { you: you.value, home: trip.value?.home, travel: travel.value }) : null,
 )
 const focus = computed(() => guide.value?.focus)
 const next = computed(() => guide.value?.next)
@@ -58,12 +61,12 @@ const phoneTime = computed(() => {
 })
 const tripCity = computed(() => trip.value?.destination ?? '')
 
-function mapsMode(meters?: number) {
-  return meters !== undefined && meters > 2800 ? 'transit' : 'walking'
+function mapsMode(leg?: { meters: number, est: { mode: string } }) {
+  if (!leg) return 'walking'
+  return leg.est.mode === 'transit' || leg.meters > 2800 ? 'transit' : 'walking'
 }
 function directionsTo(s: ResolvedStop) {
-  const legM = guide.value?.focusLeg?.meters ?? guide.value?.leg?.meters
-  return directionsUrl(s.place!, mapsMode(legM), you.value)
+  return directionsUrl(s.place!, mapsMode(guide.value?.focusLeg ?? guide.value?.leg), you.value)
 }
 
 function mark(s: ResolvedStop, status: 'done' | 'skipped') {
@@ -82,7 +85,8 @@ const legText = computed(() => {
   if (n.kind === 'move' && n.via && typeof n.via === 'object') return `Metro ${n.via.line} · ${n.via.from} → ${n.via.to}`
   if (!g.leg) return ''
   const from = g.leg.from === 'you' ? 'from you' : g.leg.from === 'home' ? `from ${trip.value?.home?.label ?? 'home'}` : 'from here'
-  return `${fmtDistance(g.leg.meters)} · ~${g.leg.est.minutes} min ${g.leg.est.mode === 'walk' ? 'walk' : 'by transit'} ${from}`
+  const e = g.leg.est
+  return `${fmtDistance(g.leg.meters)} · ${e.source === 'google' ? '' : '~'}${e.minutes} min ${e.mode === 'walk' ? 'walk' : 'by transit'} ${from}${e.ride ? ` · ${e.ride}` : ''}`
 })
 
 const leaveText = computed(() => {
@@ -96,7 +100,12 @@ const leaveText = computed(() => {
 
 // Map
 const markers = computed(() => (today.value ? stopMarkers(today.value.stops, today.value.states) : []))
-const lines = computed(() => (today.value && trip.value ? routeLines(today.value.stops, trip.value, today.value.states) : []))
+const lines = computed(() => {
+  const out = today.value && trip.value ? routeLines(today.value.stops, trip.value, today.value.states) : []
+  // The way from you to where you're going next, as Google routes it.
+  const path = guide.value?.leg?.from === 'you' ? guide.value.leg.est.points : undefined
+  return path && path.length > 1 ? [...out, { points: path, color: '--you', weight: 5, opacity: 0.85 }] : out
+})
 function showMe() {
   if (!geo.active.value) geo.start(true)
   follow.value = true
@@ -231,6 +240,7 @@ const s = v.summary
                 :to="focus.place"
                 :heading="geo.heading.value"
                 :name="focus.place.name"
+                :est="guide.focusLeg?.est"
               />
               <p v-else-if="guide.mode !== 'at' && legText" class="small muted leg">
                 <AppIcon name="route" size="sm" />{{ legText }}
@@ -306,7 +316,7 @@ const s = v.summary
               <span class="leave num"><AppIcon name="clock" size="xs" />{{ leaveText }}</span>
               <span v-if="legText" class="small muted ellipsis">{{ legText }}</span>
             </div>
-            <a v-if="next.place" class="btn icon round" :href="directionsUrl(next.place, mapsMode(guide.leg?.meters), you)" target="_blank" rel="noopener" :aria-label="`Directions to ${next.title}`">
+            <a v-if="next.place" class="btn icon round" :href="directionsUrl(next.place, mapsMode(guide.leg), you)" target="_blank" rel="noopener" :aria-label="`Directions to ${next.title}`">
               <AppIcon name="navigate" />
             </a>
           </section>

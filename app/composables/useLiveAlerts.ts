@@ -38,6 +38,7 @@ export function useLiveAlerts(v: TripView) {
   const icon = `${useRuntimeConfig().app.baseURL}pwa-192x192.png`
   const sent = new Set<string>()
   const geo = useGeo()
+  const gmaps = useGoogleMaps()
   const supported = supportsNotifications()
 
   async function notify(title: string, body: string, tag: string) {
@@ -62,10 +63,12 @@ export function useLiveAlerts(v: TripView) {
     const t = v.today.value
     const m = v.moment.value
     if (!t || !m) return
-    const g = liveGuide(t.stops, t.states, m.minutes, { you: geo.fix.value, home: v.trip.value?.home })
+    const trip = v.trip.value
+    const travel = trip ? gmaps.lookupFor(trip.timezone, t.view.day.date) : undefined
+    const g = liveGuide(t.stops, t.states, m.minutes, { you: geo.fix.value, home: trip?.home, travel })
     if (g.next && g.leaveIn !== undefined && g.leaveIn <= 2 && g.leaveIn > -10) {
       const where = g.next.place?.name ?? g.next.title
-      notify(`Time to go: ${g.next.title}`, g.leg ? `Starts ${fmtClock(g.next.start)} · ~${g.leg.est.minutes} min ${g.leg.est.mode === 'walk' ? 'walk' : 'by transit'} to ${where}` : `Starts ${fmtClock(g.next.start)}`, `leave:${t.view.day.id}:${g.next.id}`)
+      notify(`Time to go: ${g.next.title}`, g.leg ? `Starts ${fmtClock(g.next.start)} · ${g.leg.est.source === 'google' ? '' : '~'}${g.leg.est.minutes} min ${g.leg.est.mode === 'walk' ? 'walk' : 'by transit'} to ${where}${g.leg.est.ride ? ` · ${g.leg.est.ride}` : ''}` : `Starts ${fmtClock(g.next.start)}`, `leave:${t.view.day.id}:${g.next.id}`)
     }
     for (const a of t.view.day.alerts ?? []) {
       if (a.from <= m.minutes && m.minutes < Math.min(a.to, a.from + 20)) notify(fmtClock(a.from), a.text, `alert:${t.view.day.id}:${a.from}`)

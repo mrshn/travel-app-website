@@ -29,7 +29,16 @@ export function walkMinutes(meters: number): number {
 
 export interface TravelEstimate {
   mode: 'walk' | 'transit'
+  /** Door to door. */
   minutes: number
+  /** 'google' when it comes from Google's live routes, otherwise a straight-line estimate. */
+  source?: 'google'
+  /** When to set off (minutes on the trip day's clock), for a transit ride that leaves at a set time. */
+  leaveBy?: number
+  /** The first ride, e.g. "Metro A 10:04 from Termini". */
+  ride?: string
+  /** The path to draw, as [lat, lng]. */
+  points?: [number, number][]
 }
 
 export function travelEstimate(meters: number): TravelEstimate {
@@ -93,4 +102,29 @@ export function parseLatLng(text: string): LatLng | null {
     }
   }
   return null
+}
+
+/** Decodes a Google encoded polyline (precision 5) into [lat, lng] pairs. */
+export function decodePolyline(str: string): [number, number][] {
+  const out: [number, number][] = []
+  let i = 0
+  let lat = 0
+  let lng = 0
+  while (i < str.length) {
+    for (const axis of [0, 1]) {
+      let shift = 0
+      let result = 0
+      let b: number
+      do {
+        b = str.charCodeAt(i++) - 63
+        result |= (b & 0x1F) << shift
+        shift += 5
+      } while (b >= 0x20 && i < str.length)
+      const delta = result & 1 ? ~(result >> 1) : result >> 1
+      if (axis === 0) lat += delta
+      else lng += delta
+    }
+    out.push([lat / 1e5, lng / 1e5])
+  }
+  return out
 }
