@@ -5,8 +5,8 @@ const v = useTripView()
 const trip = v.trip
 const seed = computed(() => v.trips.seedOf(trip.value))
 const cloud = useCloud()
-/** Signed in with the account this app belongs to: the data is in the cloud too. */
-const signedIn = computed(() => !!cloud.user.value && cloud.status.value !== 'not-owner')
+/** Signed in with Google: the data is in your account in the cloud too. */
+const signedIn = computed(() => !!cloud.user.value)
 
 function save(f: TripFormValue) {
   const t = trip.value
@@ -92,7 +92,7 @@ function removeTrip() {
         Your data
       </h2>
       <p v-if="signedIn" class="small muted">
-        Everything is kept on this device and in your Google account. Export a backup if you want a file of your own.
+        Everything is kept on this device and in your account in the cloud. Export a backup if you want a file of your own.
       </p>
       <p v-else class="small muted">
         Everything lives in this browser on this device. Export a backup to move it to another phone or keep it safe (photos stay on this device).

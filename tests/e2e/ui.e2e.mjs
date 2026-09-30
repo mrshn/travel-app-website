@@ -6,7 +6,8 @@
 //   C2  a cost from /now through the Costs tab; L1 the tick toast with Undo on the Plan timeline, What's left, the
 //       map card and the stop sheet; C16 "Paid before" on Costs; C18 €46 on Costs, Progress and Home; S2 and S3 the
 //       stamped Pantheon card on Places; G4 the Churches header reads "Complete"
-//   O1  the generated site's map offline (--build only); Q1 no network hosts beyond the app's own services
+//   O1  the generated site's map offline (--build only); O2 the service worker leaves Firebase's sign-in pages
+//       under /__/ to the network (--build only); Q1 no network hosts beyond the app's own services
 // and the wave-2 fixes: toasts keep clear of the cost pad, a sheet in the URL takes focus, light faint text at
 // 4.5:1, the Guide's headings, read-only stars, the segmented controls' focus ring.
 // Every check opens its own phone (390 x 844, DPR 2, touch, Europe/Rome): Seed S at live Fri 9 Oct 16:40 unless
@@ -972,6 +973,30 @@ if (BUILD) {
         assert(!errors.length, errors.join(' / '))
       }))
   }
+
+  // O2: on the app's own address Google sign-in passes through Firebase's pages under /__/ (the redirect comes back
+  // to /__/auth/handler; /__/auth/iframe carries the result). Served as the app, a sign-in lands on the landing page.
+  await test('O2 with the service worker in control, Firebase\'s /__/auth/handler and /__/auth/iframe come from the network, not as the app', () =>
+    withDevice({ at: null, sw: true }, async ({ page }) => {
+      await open(page, '/')
+      await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 20000 })
+      const got = []
+      page.on('response', (r) => {
+        const u = new URL(r.url())
+        if (u.pathname.startsWith('/__/')) got.push({ path: u.pathname, fromServiceWorker: r.fromServiceWorker() })
+      })
+      await page.goto(new URL('__/auth/handler?apiKey=test&authType=signInViaRedirect', BASE).href, { waitUntil: 'domcontentloaded' })
+      await open(page, '/')
+      await page.waitForFunction(() => navigator.serviceWorker?.controller, null, { timeout: 20000 })
+      await page.evaluate(async (src) => {
+        const f = document.createElement('iframe')
+        f.src = src
+        document.body.append(f)
+        await new Promise(res => (f.onload = res))
+      }, new URL('__/auth/iframe?apiKey=test', BASE).href)
+      assert(got.some(g => g.path === '/__/auth/handler') && got.some(g => g.path === '/__/auth/iframe'), `seen: ${JSON.stringify(got)}`)
+      assert(got.every(g => !g.fromServiceWorker), `answered by the service worker: ${JSON.stringify(got.filter(g => g.fromServiceWorker))}`)
+    }))
 }
 
 // ---------- Q1: no new network hosts ----------

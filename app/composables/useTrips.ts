@@ -8,28 +8,24 @@ import { SEED_TRIPS } from '~/data/trips'
 export { SEED_TRIPS }
 
 const TRIPS_KEY = 'travel:trips:v1'
+/** Versions before accounts noted here which seeds they had added by themselves. Only removed now (clearAll). */
 const SEEDED_KEY = 'travel:seeded:v1'
 
 const seedKey = (t: Trip) => t.seedId ?? t.id
 
 const useTripStore = createGlobalState(() => {
   const trips = useStorage<Trip[]>(TRIPS_KEY, [])
-  const seeded = useStorage<string[]>(SEEDED_KEY, [])
   /** Trips with a newer version waiting because you changed them here. */
   const updates = ref<Record<string, Trip>>({})
 
+  // Seeds are never added by themselves (spec D37: a trip comes from you, or from "Try the sample trip"). A copy of
+  // one gets the newer versions pushed to the repo: quietly while you haven't changed it, else as Update / Keep mine.
   for (const seed of SEED_TRIPS) {
     const key = seedKey(seed)
     const version = planFingerprint(seed)
     const i = trips.value.findIndex(t => t.seedId === key || t.id === seed.id)
     const local = trips.value[i]
-    if (!seeded.value.includes(key)) {
-      // A trip that's new to this device.
-      if (!local) trips.value.push(copyOfSeed(seed))
-      seeded.value = [...seeded.value, key]
-      continue
-    }
-    if (!local || local.seedVersion === version) continue // deleted here, or up to date
+    if (!local || local.seedVersion === version) continue // not on this device, or up to date
     if (!local.seedVersion && planFingerprint(local) === version) {
       local.seedVersion = version // saved before versions existed, and unchanged
       continue
@@ -188,14 +184,33 @@ export function useTrips() {
     delete updates.value[id]
   }
 
-  /** Brings back a seeded trip you deleted. */
-  function restoreSeed(seedId: string): Trip | undefined {
-    const seed = SEED_TRIPS.find(s => seedKey(s) === seedId)
+  /**
+   * "Try the sample trip": adds a copy of a seed trip (default: the first) to this device, keeping its seedId so
+   * newer versions pushed to the repo still reach it. A trip with that id already here is returned as it is.
+   */
+  function addSample(seedId?: string): Trip | undefined {
+    // Anything but a string (say, the click event of a handler bound as `@click="addSample"`) means the default.
+    const seed = typeof seedId === 'string' ? SEED_TRIPS.find(s => seedKey(s) === seedId) : SEED_TRIPS[0]
     if (!seed) return undefined
-    if (get(seed.id)) return get(seed.id)
-    const t = copyOfSeed(seed)
+    const have = get(seed.id)
+    if (have) return have
+    // Created now: a copy the account deleted earlier on another device doesn't take this one away (sync's decide()).
+    const t = copyOfSeed(seed, { id: seed.id, createdAt: new Date().toISOString() })
     trips.value.push(t)
-    return t
+    return get(t.id)
+  }
+
+  /**
+   * Removes every trip from this device, with the updates waiting for them and the old seeded bookkeeping (another
+   * account's copy is about to arrive, or the device is being cleared). Never touches the cloud by itself.
+   */
+  function clearAll() {
+    trips.value = []
+    updates.value = {}
+    try {
+      localStorage.removeItem(SEEDED_KEY)
+    }
+    catch { /* storage refused */ }
   }
 
   function upsertStop(tripId: string, dayId: string, variant: string | undefined, stop: Stop) {
@@ -236,5 +251,5 @@ export function useTrips() {
     trips.value = next
   }
 
-  return { trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, restoreSeed, updateFor, applyUpdate, skipUpdate, upsertStop, moveStop, removeStop, replaceAll }
+  return { trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, addSample, updateFor, applyUpdate, skipUpdate, upsertStop, moveStop, removeStop, replaceAll, clearAll }
 }

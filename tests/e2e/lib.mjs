@@ -11,7 +11,7 @@
 // the generated site with serveBuild() and points TRAVELS_URL at it.
 //
 // Run on its own it is a smoke test: Seed S at live Fri 9 Oct 16:40, every trip route at 390 and 320 px
-// with no page error, on full loads and on client-side navigation:
+// with no page error, on full loads and on client-side navigation; and a device with no account kept on "/":
 //   node tests/e2e/lib.mjs            (against TRAVELS_URL or the dev server)
 //   node tests/e2e/lib.mjs --build    (serves .output/public on port 4173 and checks that)
 import { readFileSync } from 'node:fs'
@@ -43,6 +43,33 @@ export function loadTrip() {
   const src = readFileSync(join(ROOT, 'app/data/rome.ts'), 'utf8')
   return JSON.parse(src.slice(src.indexOf('{', src.indexOf('romeTrip')), src.lastIndexOf('}') + 1))
 }
+
+/** FNV-1a, 32-bit, as hex: hashString of shared/utils/seed.ts. */
+function hashString(s) {
+  let h = 0x811C9DC5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+/**
+ * A copy of a seed trip as the app makes one (copyOfSeed of shared/utils/seed.ts): what versions before accounts put
+ * on every device by themselves, and what "Try the sample trip" adds (which also dates createdAt to the moment it
+ * adds the copy). Default: the Rome trip.
+ */
+export function romeCopy(seed = loadTrip()) {
+  const { id: _id, createdAt: _c, updatedAt: _u, seedVersion: _v, edited: _e, ...plan } = seed
+  const copy = JSON.parse(JSON.stringify(seed))
+  copy.seedVersion = hashString(JSON.stringify(plan))
+  copy.edited = false
+  copy.updatedAt = new Date().toISOString()
+  return copy
+}
+
+/** The made-up account a test phone remembers unless it is signed out (nothing personal). */
+export const TEST_ACCOUNT = Object.freeze({ uid: 'e2e-traveller', name: 'Test Traveller', email: 'traveller@example.com', photo: null })
 
 /**
  * The instant of a wall-clock time in Rome, as ISO. Takes "2026-10-09T16:40" (Rome time) or anything
@@ -104,11 +131,18 @@ export function seedS(trip = loadTrip()) {
  * A phone: 390 x 844 (or width/height), DPR 2, touch (so `pointer: coarse` applies), Europe/Rome, light or
  * dark. `progress` (for TRIP) is put in localStorage before any script runs, unless the page already has
  * saved progress (so a reload keeps what the app wrote). Service workers are blocked unless `sw: true`.
+ *
+ * Signed in by default: before the first page runs, the phone remembers TEST_ACCOUNT (as after a sign-in; Firebase
+ * isn't loaded, so nothing talks to the cloud and the app's cloud status stays 'off') and holds `trips` (default: a
+ * copy of the Rome trip, TRIP, as the app makes one). `signedOut: true` is a device with no account: it opens on the
+ * landing page and holds only the `trips` (and `progress`) you give it, say an old device from before accounts.
+ * These are written once per phone, on its first page: a reload, a sign-out or a removal keeps what the app did.
+ *
  * Other options go to browser.newContext() (e.g. reducedMotion: 'reduce').
  * Returns { ctx, page, errors, consoleErrors }; `errors` collects page errors (uncaught exceptions).
  */
 export async function phone(browser, opts = {}) {
-  const { dark, width = 390, height = 844, progress, sw, ...rest } = opts
+  const { dark, width = 390, height = 844, progress, sw, signedOut = false, trips, ...rest } = opts
   const ctx = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: 2,
@@ -119,6 +153,16 @@ export async function phone(browser, opts = {}) {
     serviceWorkers: sw ? 'allow' : 'block',
     ...rest,
   })
+  const device = { account: signedOut ? null : TEST_ACCOUNT, trips: trips ?? (signedOut ? null : [romeCopy()]) }
+  await ctx.addInitScript((d) => {
+    try {
+      if (localStorage.getItem('travel:e2e:device')) return
+      localStorage.setItem('travel:e2e:device', '1')
+      if (d.account && localStorage.getItem('travel:account:v1') === null) localStorage.setItem('travel:account:v1', JSON.stringify(d.account))
+      if (d.trips && localStorage.getItem('travel:trips:v1') === null) localStorage.setItem('travel:trips:v1', JSON.stringify(d.trips))
+    }
+    catch { /* storage refused */ }
+  }, device)
   if (progress) {
     await ctx.addInitScript(([p, id]) => {
       try {
@@ -497,6 +541,30 @@ if (isMain) {
       }
       if (wide.length) console.log(`note: sideways scroll at ${width} px on ${wide.join(', ')}`)
       await ctx.close()
+    }
+    // Sign-in required (spec D33): a device with no account only ever sees "/", whatever it holds from before accounts.
+    const home = new URL(BASE).pathname
+    const old = await phone(browser, { signedOut: true, trips: [romeCopy(trip)], progress: seed })
+    try {
+      for (const path of [`trips/${TRIP}/now`, `trips/${TRIP}/costs`, 'notes', 'settings', 'trips/new']) {
+        await check(`with no account, /${path} goes to the landing page and shows nothing of the device's trip`, async () => {
+          old.errors.length = 0
+          await old.page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' })
+          await ready(old.page)
+          assert(new URL(old.page.url()).pathname === home, `stayed at ${old.page.url()}`)
+          assert(!(await old.page.locator('.shell').count()), 'a trip screen shows')
+          assert(!(await old.page.locator('body').innerText()).includes(trip.subtitle), 'the trip on the device shows')
+          assert(!old.errors.length, `page error: ${old.errors.join(' / ')}`)
+        })
+      }
+      await check('with no account, client-side navigation to a trip route ends on the landing page too', async () => {
+        await go(old.page, 'now')
+        assert(new URL(old.page.url()).pathname === home, `at ${old.page.url()}`)
+        assert(!(await old.page.locator('.shell').count()), 'a trip screen shows')
+      })
+    }
+    finally {
+      await old.ctx.close()
     }
   }
   finally {

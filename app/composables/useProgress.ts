@@ -7,6 +7,13 @@ export const useProgressStore = createGlobalState(() =>
   useStorage<Record<string, TripProgress>>('travel:progress:v1', {}),
 )
 
+/**
+ * Counts the times this device's copy was removed: another account's copy is about to arrive, or it was removed from
+ * this device (useCloud, spec D35 and D44). A change begun on one copy never lands in the next one: a trip screen
+ * opened on the old copy writes nothing more, and a photo being saved or fetched for it is dropped.
+ */
+export const useCopyEpoch = createGlobalState(() => shallowRef(0))
+
 /** A cost to log: everything but the bookkeeping. `id` only for fixed ids (legacy-stop-…, legacy-day-…). */
 export type NewExpense = Omit<Expense, 'id' | 'at' | 'updatedAt' | 'deleted'> & { id?: string, at?: string }
 
@@ -27,6 +34,10 @@ function defined<T extends object>(o: T, ...drop: string[]): T {
 /** What you did on one trip: marks, feedback, picked options, bookings, packing, costs and stamps. */
 export function useProgress(tripId: MaybeRefOrGetter<string>) {
   const store = useProgressStore()
+  const trips = useTrips()
+  const copy = useCopyEpoch()
+  /** The device copy this was opened on: once that copy is removed, nothing more is written through it. */
+  const opened = copy.value
 
   const progress = computed<TripProgress>(() => {
     const p = store.value[toValue(tripId)]
@@ -35,7 +46,9 @@ export function useProgress(tripId: MaybeRefOrGetter<string>) {
 
   function edit(fn: (p: TripProgress) => void) {
     const id = toValue(tripId)
-    if (!id) return
+    if (!id || copy.value !== opened) return
+    // Only for a trip on this device: a screen still open on a trip that just went never brings its progress back.
+    if (!store.value[id] && !trips.get(id)) return
     if (!store.value[id]) store.value[id] = emptyProgress()
     const p = store.value[id]!
     // Older saves may miss newer fields.
@@ -183,7 +196,7 @@ export function useProgress(tripId: MaybeRefOrGetter<string>) {
 
   function clear() {
     const id = toValue(tripId)
-    if (id) delete store.value[id]
+    if (id && copy.value === opened) delete store.value[id]
   }
 
   return {

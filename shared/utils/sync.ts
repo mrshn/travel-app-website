@@ -154,6 +154,15 @@ export function isPristine(kind: ItemKind, json: string): boolean {
 }
 
 /**
+ * A trip put on this device after `at` (milliseconds): its createdAt, which "Try the sample trip" sets to the moment
+ * it adds the copy, and a new trip to the moment it is made. A copy of a seed the app added by itself before accounts
+ * carries the seed's own date.
+ */
+function addedAfter(kind: ItemKind, json: string, at: number): boolean {
+  return kind === 'trip' && timeOf((JSON.parse(json) as Trip).createdAt) > at
+}
+
+/**
  * A newer cloud copy with this device's costs and stamps merged back in (mergeRecords), when taking it as it is
  * would lose some: it lacks one of them, or holds an older version of one (so an edit, a deletion or a stamp
  * taken back would be undone). Else undefined. Everything else comes from the newer copy, as when applying it.
@@ -206,8 +215,9 @@ export function decide(kind: ItemKind, local: string | undefined, remote: CloudI
   if (remote.deleted) {
     if (local === undefined) return { do: 'nothing' }
     if (!localChanged) return { do: 'delete-local' }
-    // Deleted elsewhere but changed here: keep yours, unless there's nothing of yours in it.
-    return !known && isPristine(kind, local) ? { do: 'delete-local' } : { do: 'upload' }
+    // Deleted elsewhere but changed here: keep yours, unless there's nothing of yours in it. A trip put here after
+    // the deletion is yours all the same (the sample tried again on a new device): the deletion was of another copy.
+    return !known && isPristine(kind, local) && !addedAfter(kind, local, remote.updatedAt) ? { do: 'delete-local' } : { do: 'upload' }
   }
   if (local === undefined || !localChanged || localHash === jsonHash(remote.json)) {
     // Taking the newer copy must never lose or roll back this device's costs and stamps (an older app

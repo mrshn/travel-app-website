@@ -1,5 +1,5 @@
 import { createGlobalState } from '@vueuse/core'
-import type { Note, NoteKind } from '#shared/utils/notes'
+import { notesFor, type Note, type NoteKind } from '#shared/utils/notes'
 
 export const NOTE_META: Record<NoteKind, { label: string, plural: string, icon: string }> = {
   chat: { label: 'Chat', plural: 'Chats', icon: 'chat' },
@@ -25,8 +25,11 @@ export const useNotes = createGlobalState(() => {
 
   const forTrip = (tripId: string) => computed(() => notes.value.filter(n => n.trip === tripId))
   const get = (slug: string) => notes.value.find(n => n.slug === slug)
+  /** What the lists show this account: the notes of its trips, and those of no trip (spec D43). */
+  const { trips } = useTrips()
+  const visible = computed(() => notesFor(notes.value, trips.value.map(t => t.id)))
 
-  return { notes, ready, load, forTrip, get }
+  return { notes, visible, ready, load, forTrip, get }
 })
 
 export function githubEditUrl(file: string): string {

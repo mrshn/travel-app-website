@@ -8,8 +8,9 @@ tags: [app, how-to]
 
 ## On your phone
 
-- Open https://travela-emre.firebaseapp.com and **Add to Home Screen**. It then opens full screen and works offline.
-- **Sign in with Google** (the prompt on the home screen, or Settings → Your account) so everything is kept in your account and on every device.
+- Open https://travela-emre.firebaseapp.com (the app's only address) and **Add to Home Screen**. It then opens full screen and works offline.
+- The first screen shows what the app does. Tap **Sign in with Google**: on the phone, Google's page opens and brings you back to the app (on a computer, a small window opens). Any Google account works, and each one sees only its own trips.
+- A new account starts empty: **Plan a trip**, or **Try the sample trip** for the full Rome plan, ready to make your own.
 - A trip has five tabs at the bottom: **Now**, **Plan**, **Places**, **Costs** and **More**.
 - **Now** is the screen to keep open: the stop you should be at, time left, the next stop and when to leave. **Show me** turns on your location and the map follows you.
 - **Remind me when to leave** gives a nudge while the app is open; **Keep screen on** helps while walking.
@@ -45,11 +46,15 @@ tags: [app, how-to]
 
 ## Your data
 
-- Signed in, what you tick, rate, write, log, stamp and photograph is kept on the phone and in your Google account, and synced between your devices. Offline, it waits on the phone and syncs when you're back online; costs and stamps from two phones are merged one by one, so none are lost.
-- Only your account can use the app: the first sign-in claims it.
+- Everything you tick, rate, write, log, stamp and photograph is saved to your account in the cloud (stored under your Google sign-in) and kept on the phone, so it works offline and is the same on every device you sign in on. Offline, it waits on the phone and syncs when you're back online; costs and stamps from two phones are merged one by one, so none are lost.
+- Your trips are private to your account. Only the phone's own settings stay on the phone alone, such as the look, the map choice, alerts and which celebrations it already showed.
+- **Sign out** (**Settings → Your account**) takes you back to the first screen, and the phone keeps your trips for when you sign back in, offline too. If some changes haven't reached your account yet, it warns you first: stay signed in until you're online. **Sign out and remove from this device** clears the phone.
+- On a phone that used the app before accounts, the first sign-in brings its trips and ticks into your account.
+- Signing in with another Google account on the same phone clears the phone's copy first; everything that reached the first account stays there. If some changes haven't reached the first account yet, the app asks before removing them: **Cancel** keeps them, so you can sign in with the first account and save them.
+- If the app says **Sign in again to keep saving to your account**, tap **Sign in with Google** under it. Until then, your changes wait on the phone.
 - **Settings → Export everything** still makes a backup file of your own. **Import a backup** merges the file's ticks, costs and stamps with the phone's instead of replacing them.
-- The plans and these notes come from the GitHub repository, so they're the same on every device.
-- The old address (mrshn.github.io/travel-app-website) now points here. Sign in there once so what you logged there comes along.
+- These notes and the sample trip come from the GitHub repository. A trip's own notes (its research, its planning chat) show for the accounts that have that trip, for example after **Try the sample trip**.
+- The old copy at mrshn.github.io/travel-app-website isn't updated any more and can't reach your account. If you logged anything there, use its **Settings → Export everything**, then **Import a backup** here.
 
 ## Saving chats with Claude
 
@@ -59,6 +64,6 @@ In a chat, ask Claude to:
 - **"Add this trip to Travels"** or **"Update the Rome trip in Travels"**: the plan becomes (or updates) a trip in the app, with days, stops, map pins, bookings and packing.
 - **"Plan a trip to …"**: Claude asks a few questions first, researches, and offers to save the result here.
 
-After Claude pushes to GitHub, the site rebuilds in about two minutes. A trip you haven't changed on your phone updates by itself; if you have, the app asks before replacing anything and keeps your ticks, notes and own stops.
+After Claude pushes to GitHub, the site rebuilds in about two minutes. A trip saved here isn't added to your account by itself: add it in **Settings**, under **Try the sample trip**. A copy you took from it, like the sample trip, follows its updates: if you haven't changed its plan, it updates by itself; if you have, an **Update / Keep mine** banner asks first, and updating keeps your ticks, notes and own stops.
 
 The repository is public: anything saved here can be read by anyone with the link, so personal details like passport numbers or your birth date are left out.

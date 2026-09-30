@@ -6,7 +6,7 @@ import {
   type User,
 } from 'firebase/auth'
 import {
-  collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, onSnapshot, runTransaction, setDoc,
+  collection, connectFirestoreEmulator, doc, getDocs, getFirestore, onSnapshot, runTransaction, setDoc,
 } from 'firebase/firestore'
 import { connectStorageEmulator, deleteObject, getBlob, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
 import type { CloudItem } from '#shared/utils/sync'
@@ -39,8 +39,14 @@ export function createFirebase(config: FirebaseConfig, emulators = '') {
     connectStorageEmulator(storage, emulators, 9199)
   }
   const provider = new GoogleAuthProvider()
-  provider.setCustomParameters({ prompt: 'select_account' })
+  /** Google's account list, with `hint` (an email: the account this device remembers) picked out when there is one. */
+  const google = (hint?: string) => {
+    provider.setCustomParameters(hint ? { prompt: 'select_account', login_hint: hint } : { prompt: 'select_account' })
+    return provider
+  }
 
+  // Each Google account has its own trips, progress and photos, readable and writable by that account only
+  // (firebase/firestore.rules and storage.rules).
   const items = (uid: string) => collection(db, 'users', uid, 'items')
   const photoRef = (uid: string, id: string) => ref(storage, `users/${uid}/photos/${id}.jpg`)
 
@@ -48,20 +54,10 @@ export function createFirebase(config: FirebaseConfig, emulators = '') {
     auth,
     onUser: (fn: (u: User | null) => void) => onAuthStateChanged(auth, fn),
     redirectResult: () => getRedirectResult(auth),
-    signInRedirect: () => signInWithRedirect(auth, provider),
-    signInPopup: () => signInWithPopup(auth, provider),
+    signInRedirect: (hint?: string) => signInWithRedirect(auth, google(hint)),
+    /** Opens Google's sign-in window: call it straight from the tap, with nothing awaited before it. */
+    signInPopup: (hint?: string) => signInWithPopup(auth, google(hint)),
     signOut: () => signOut(auth),
-
-    /** Claims the app for the first account that signs in; false if it belongs to someone else. */
-    async claim(uid: string): Promise<boolean> {
-      const owner = doc(db, 'meta', 'owner')
-      const snap = await getDoc(owner)
-      if (!snap.exists()) {
-        await setDoc(owner, { uid, claimedAt: Date.now() })
-        return true
-      }
-      return (snap.data() as { uid?: string }).uid === uid
-    },
 
     watchItems(uid: string, fn: (items: Map<string, CloudItem>, meta: { fromCache: boolean }) => void, onError: (e: unknown) => void) {
       return onSnapshot(items(uid), { includeMetadataChanges: true }, (snap) => {
@@ -107,10 +103,15 @@ export function createFirebase(config: FirebaseConfig, emulators = '') {
       if (!emulators) throw new Error('emulators only')
       return signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub, email, email_verified: true })))
     },
-    /** Tests only: reads another account's items directly (the rules should refuse). */
-    async peek(uid: string) {
+    /** Tests only: reads an account's item ids directly (for another account, the rules should refuse). */
+    async peek(uid: string): Promise<string[]> {
       if (!emulators) throw new Error('emulators only')
-      return (await getDocs(items(uid))).size
+      return (await getDocs(items(uid))).docs.map(d => d.id)
+    },
+    /** Tests only: writes a well-formed item into an account's items (for another account, the rules should refuse). */
+    poke(uid: string) {
+      if (!emulators) throw new Error('emulators only')
+      return setDoc(doc(items(uid), 'trip-poke'), { kind: 'trip', ref: 'poke', json: '{}', updatedAt: Date.now() })
     },
   }
 }

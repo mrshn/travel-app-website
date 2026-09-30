@@ -1442,3 +1442,261 @@ backspace: '<path d="M9 5h11v14H9l-6-7z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/
 
 `COST_META`: Food `food` `--c-food`; Sights `ticket` `--c-sight`; Nightlife `glass` `--c-night`; Transport `metro`
 `--c-move`; Stay `bed` `--c-rest`; Other `tag` `--c-task`.
+
+---
+
+## 12. Accounts and one home
+
+Added on 30 Sep 2026, after the owner tried Google sign-in on the phone, and placed after the appendices so that
+nothing above changes. It records decisions D30 to D41, the contract between the three packages that build them,
+and their acceptance tests.
+
+### 12.1 The request and what went wrong
+
+The owner's words, verbatim:
+
+> In the mobile side the popup was blocked also Unable to process request due to missing initial state. This may
+> happen if browser sessionStorage is inaccessible or accidentally cleared. Some specific scenarios are - 1) Using
+> IDP-Initiated SAML SSO. 2) Using signInWithRedirect in a storage-partitioned browser environment.
+>
+> I want you to deploy to only 1 place not multiple places. Also every trip detail needs to be user specific I think
+> we can use firebase auth only right? Have a landing page for the app about telling the features and implement the
+> features as I said so that everthing is recorded in the firestore
+
+The diagnosis, from the code and Firebase's documentation:
+
+- **"The popup was blocked."** Off the Firebase domain (the GitHub Pages copy), `signIn()` in
+  `app/composables/useCloud.ts` awaited the dynamic Firebase import before `signInWithPopup`, so the popup no longer
+  opened inside the tap's user gesture and Safari blocked it.
+- **"Missing initial state."** Firebase's handler page on `travela-emre.firebaseapp.com` lost its sessionStorage
+  state. That happens when the redirect starts on another domain (storage partitioning: the Pages copy) or when a Home
+  Screen web app's Google page runs outside the app's browsing context. Firebase's guidance
+  (https://firebase.google.com/docs/auth/web/redirect-best-practices): an app served from the `firebaseapp.com`
+  domain that is its `authDomain` is not affected by the partitioning problem. Fixes for installed web apps use
+  `signInWithRedirect` there, because popups fail in iOS Home Screen apps.
+- **One account only.** The rules let only the first account (`meta/owner`) use the app, and a second account signing
+  in on the same device would have merged the first account's device copy into its own account. Both change for
+  per-account data.
+
+### 12.2 Decisions
+
+Numbered after D1 to D29 (section 2).
+
+**D30. One home: https://travela-emre.firebaseapp.com.** CI deploys only to Firebase Hosting: the site, the Firestore
+rules and the Storage rules. The GitHub Pages jobs and the `pages` permission go. `travela-emre.web.app` keeps
+forwarding to `firebaseapp.com` (`app/plugins/cloud.client.ts` already does). The Pages-only "Travels has a new home"
+block in `app/pages/index.vue` and `appConfig.firebaseLive` go. The copy already published on Pages stays online until
+the owner unpublishes it in GitHub (Settings > Pages); the README says how. Why: the owner's "deploy to only 1 place",
+and sign-in only works reliably on the address that is the app's `authDomain` (12.1).
+
+**D31. How sign-in opens, on the app's own address** (`location.hostname === appConfig.firebase.authDomain`). An
+installed Home Screen app (`navigator.standalone`, or `display-mode` `standalone`, `fullscreen` or `minimal-ui`) or a
+touch device (`matchMedia('(pointer: coarse)')` or a mobile user agent) uses `signInWithRedirect`. A desktop browser
+tab uses `signInWithPopup`, called synchronously inside the click (no `await` before it: Firebase is preloaded with
+`cloud.prepare()` as soon as a sign-in button is on screen); on `auth/popup-blocked` it falls back to
+`signInWithRedirect`. On any other host (localhost, tests) it uses the popup, as before. `getRedirectResult` runs at
+start, as before, and its error shows where the sign-in button is. A failed return from Google says "Sign-in didn't
+finish. Open travela-emre.firebaseapp.com in Safari or Chrome and try again." Why: 12.1. A redirect keeps a Home
+Screen app in its own browsing context, and a popup opened inside the tap is not blocked.
+
+**D32. Any Google account can sign in, and each one reads and writes only its own data.**
+`firebase/firestore.rules`: `users/{uid}/items/{item}` is readable and writable only when `request.auth.uid == uid`,
+keeping today's field checks and adding `json.size() < 1000000`; everything else is denied. `meta/owner` and `claim()`
+go; the old owner document stays in the database untouched (cloud data is never deleted). `firebase/storage.rules`
+stay (already per uid). The setup script's sign-up lock stays an optional tool that is not run, and its texts stop
+saying that the first sign-in claims the app. Why: the owner's "every trip detail needs to be user specific", with
+Firebase Auth only.
+
+**D33. Sign-in is required.** A device with no account sees the landing page at `/`; every other route
+(`/trips/...`, `/notes`, `/notes/...`, `/settings`, `/trips/new`) sends it to `/` (a global route middleware). The
+signed-in home at `/` is today's trips list.
+
+**D34. A device remembers the account it belongs to.** `localStorage` `travel:account:v1` holds
+`{ uid, name, email, photo }`, written when someone signs in. With a remembered account the app opens straight into
+the trips from the device's copy (offline too) while Firebase restores the session in the background. If Firebase
+reports no session, the app stays usable and shows "Sign in again to keep saving to your account." with a Sign in
+button on the home screen and in settings; it never throws the person out.
+
+**D35. The device copy belongs to one account.** Signing in on a device whose copy has no remembered account (the app
+as used before this change, for example the Rome trip seeded on the phone and its ticks) merges that copy into the
+account, as before. Signing in with a different account than the remembered one first clears the device copy (trips,
+progress, the cloud sync memory, the seeded and pending-update bookkeeping, photos in IndexedDB), then that account's
+data arrives from Firestore. The decision (keep, adopt or clear) is a pure function in `shared/utils/account.ts` with
+unit tests. Why: one account's trips must never reach another account (12.1).
+
+**D36. Sign out returns to the landing page.** The device copy stays with the remembered account, so the same person
+signing back in sees it at once (offline too); until then it is hidden behind the landing page. When changes haven't
+reached the account yet (items this device hasn't agreed with the cloud, or photos waiting), sign-out first warns:
+"{n} changes haven't reached your account yet. Stay signed in until you're online, or sign out anyway." with
+[Stay signed in] and [Sign out anyway]. "Sign out and remove from this device" (the old forget) clears the device
+copy and the remembered account.
+
+**D37. Trips are per account: nothing is added to an account automatically.** The signed-in home with no trips
+offers "Plan a trip" (`/trips/new`) and "Try the sample trip" (a copy of the Rome plan with its `seedId`, so updates
+pushed to the repository still reach it through Update / Keep mine). Copies that already carry a `seedId` keep
+receiving updates as before. The "seeded" bookkeeping that added seed trips by itself goes; the update check stays.
+
+**D38. A landing page at `/` for a device with no account.** Mobile first, in the app's Roman look. The hero: the
+app's name, a one-line promise, [Sign in with Google], and "Free · private to your Google account · works offline".
+One feature card per job: Now (what to do this minute, when to leave), Plan (days, options, the Colosseum-style
+switches), Places (collect stamps, sets), Costs (a 3-tap keypad, euros and your home currency), Badges and ranks
+(Peregrinus to Imperator), Offline and on every device, and Private. "How it works" in three steps: sign in; plan a
+trip or try the sample; open Now on the day. Visuals come only from the existing SVG art (`SceneArt`, `StampMark`,
+`BadgeSeal` with sample props): no images and no external requests. Light and dark, 320 to 1280 px. It never shows
+trip data from the device. Why: the owner's "Have a landing page for the app about telling the features".
+
+**D39. Everything the traveller records is in Firestore.** Trips, and progress with ticks, ratings, notes, costs,
+stamps, bookings, packing, day notes and choices, under `users/{uid}/items`; photos in Storage under
+`users/{uid}/photos`; as before, once signed in. Device-only by design: the theme, the map choice, alert settings,
+and which celebrations this device already showed. Why: the owner's "everthing is recorded in the firestore".
+
+**D40. One deploy job.** On a push to `main` (and `workflow_dispatch`): checkout, Node 22, `npm ci`, unit tests,
+typecheck, `generate` with `NUXT_APP_BASE_URL=/`, keyless Google auth (the same Workload Identity provider and service
+account), then `firebase-tools@15 deploy --only hosting,firestore:rules,storage`. Billing is on, so the Storage rules
+are no longer `continue-on-error`. The `firebase-ready` gate and `.github/firebase-ready` go.
+`.github/workflows/cloud-tests.yml` stays.
+
+**D41. Tests.** Unit tests for `shared/utils/account.ts`. `tests/e2e/cloud.e2e.mjs` (emulators): two accounts on two
+devices can't read each other's items (the rules); on one device A signs out and B signs in, B never sees A's trips
+and nothing of A's reaches B's account; A signs back in on that device and gets A's data back from the cloud;
+sign-out with pending changes warns; every existing sync check keeps passing (the owner check becomes the isolation
+check). `phone()` in `tests/e2e/lib.mjs` marks the device as signed in by default (a remembered account written
+before any script runs, Firebase not loaded), so every existing browser suite keeps running;
+`phone(browser, { signedOut: true })` opens as a device with no account.
+
+### 12.3 Contract between the packages
+
+`useCloud()` keeps its current fields and gains or changes these:
+
+| Name | Type | What it is |
+|---|---|---|
+| `account` | `ComputedRef<CloudUser \| null>` | The remembered account (`travel:account:v1`): set at sign-in; after a sign-out it reads `null` (the landing page shows) while the device keeps the record, marked `out`, with its copy for the same account; cleared by `forget()` |
+| `signedIn` | `ComputedRef<boolean>` | Firebase reports a user right now |
+| `prepare()` | `Promise<void>` | Loads Firebase ahead of a tap where sign-in opens a popup (called when a sign-in button mounts); where it goes to Google's page, nothing loads before the tap (12.6) |
+| `signIn()` | `Promise<void>` | D31 |
+| `signOut(opts?: { force?: boolean })` | `Promise<'done' \| 'pending'>` | Returns `'pending'` and changes nothing when there are unsynced changes and `force` isn't true |
+| `forget()` | `Promise<void>` | Signs out and clears the device copy and the remembered account |
+| `pending` | `ComputedRef<number>` | Items not yet agreed with the cloud, plus photos waiting |
+| `status` | `CloudStatus` | As before, without `'not-owner'` |
+
+`useTrips().addSample(seedId?: string): Trip | undefined` adds a copy of a seed trip (the first seed by default) to
+the device copy; the empty home calls it. A route middleware sends a device with no remembered account and no
+signed-in user to `/` from every route except `/`.
+
+### 12.4 Acceptance tests (browser unless marked)
+
+- **W1** A fresh device at `/` sees the landing page, with no trip data; `/trips/rome-2026-10/now`, `/notes` and
+  `/settings` go to `/`.
+- **W2** The landing page at 390 × 844, 320 × 640 and 1280 px, light and dark: no sideways scroll, targets of at
+  least 44 px, text contrast of 4.5:1, every feature card present, one primary [Sign in with Google] above the fold on
+  a phone, and no network request except to the app's own origin.
+- **W3** The sign-in method (unit, or browser with stubs): standalone or a coarse pointer on the app's own address
+  uses the redirect; a desktop uses the popup inside the click; a blocked popup falls back to the redirect; other
+  hosts use the popup.
+- **W4** (emulators) Two accounts can't read each other's items. A signs out and B signs in on the same device: B's
+  home shows none of A's trips and B's cloud gets none of A's items; A signs back in and gets A's trips back.
+- **W5** (emulators) A device used before this change (Rome seeded, ticks) signs in for the first time: its trips and
+  progress reach the account.
+- **W6** Signed in with no trips: "Plan a trip" and "Try the sample trip"; the sample appears with its `seedId`, and
+  the Update / Keep mine flow still works.
+- **W7** Sign-out with pending changes shows the warning; [Stay signed in] keeps everything; [Sign out anyway] goes to
+  the landing page.
+- **W8** A remembered account whose session is gone: the app opens into the trips, and home and settings show "Sign in
+  again to keep saving to your account."
+- **W9** `.github/workflows/deploy.yml` has one job and no GitHub Pages step, and its YAML is valid.
+- **W10** Every existing gate stays green: `npm test`, `npm run typecheck`, `npm run generate`,
+  `node tests/e2e/lib.mjs --build` and all the browser suites (costs, places, game, day, ui) against the build; no em
+  dash in any new or changed file; `package.json` and `package-lock.json` unchanged.
+
+### 12.5 Delivery
+
+Three packages work at the same time on disjoint files (new ones in bold), in one checkout as in section 10.
+Nothing touches the real Firebase project, Google Cloud or GitHub: everything is tested locally or on the emulators.
+
+| Package | Scope | Files |
+|---|---|---|
+| A · Accounts and sign-in | D31 to D37, D39 and D41 on its files; provides the contract (12.3) | `app/lib/firebase.ts`; `app/composables/useCloud.ts`; `app/plugins/cloud.client.ts`; `app/composables/useTrips.ts`; `app/lib/photoStore.ts`; `app/composables/usePhotos.ts`; **`app/middleware/auth.global.ts`**; **`shared/utils/account.ts`**; **`tests/account.test.ts`**; `firebase/firestore.rules`; `tests/e2e/cloud.e2e.mjs`; `tests/e2e/lib.mjs` |
+| B · Landing page, home and account UI | D30's home and app config, D33, D34's messages, D36's warning, D37's empty home, D38, D39's settings copy; codes against the contract | `app/pages/index.vue`; **`app/components/LandingPage.vue`** (and any other new `Landing*.vue`); `app/components/AccountCard.vue`; `app/pages/settings.vue`; `app/app.config.ts`; `nuxt.config.ts` (title and description only); **`tests/e2e/landing.e2e.mjs`** |
+| C · One deploy, the script's texts and the docs | D40; D32's setup-script texts; the README, the content guide, the how-to note and this section | `.github/workflows/deploy.yml`; `.github/firebase-ready` (deleted); `scripts/setup-google-cloud.sh` (texts and the lock step's wording); `README.md`; `docs/content-guide.md`; `content/notes/2026-09-30-how-to-use-travels.md`; `docs/design/2026-09-30-ui-refresh.md` (this section) |
+
+### 12.6 As built: decisions taken while putting the packages together
+
+- **The service worker leaves Firebase's pages under `/__/` to the network.** Its app-shell fallback answered every
+  navigation, `/__/auth/handler` and `/__/auth/iframe` included, and on the app's own address both carry Google
+  sign-in: once the service worker was installed, a redirect (and a desktop popup's first page) came back as the
+  landing page, so sign-in did nothing. `navigateFallbackDenylist` in `nuxt.config.ts` now holds `/^\/__\//` beside
+  the archive; O2 in `tests/e2e/ui.e2e.mjs` checks it on the build. (The emulator tests never saw this: the Auth
+  emulator's pages live on another address.)
+- **`prepare()` loads Firebase only where the popup is used.** On an iPhone, an Android phone or Safari, Firebase
+  fetches Google's sign-in script (apis.google.com) as soon as it loads, so preloading it on every landing page broke
+  W2 on real phones. A phone, a tablet or the Home Screen app on the app's own address goes to Google's page, which
+  needs nothing ready before the tap, so there Firebase loads at the tap. A desktop browser still preloads it for the
+  popup. Desktop Safari is the one place the landing page still asks Google before the tap (Firebase's own preload,
+  which its popup needs).
+- **A sign-in under way stays "Signing in…".** Firebase loaded by the tap first reports nobody signed in; that no
+  longer turns the button back before the browser leaves for Google's page. `signIn()` sets the status once it ends.
+- **A copy added after a deletion stays.** "Try the sample trip" dates the copy's `createdAt` to the moment it adds
+  it, and sync's `decide()` keeps a trip this device never synced when it was made after the account's deletion of
+  that trip (another copy, deleted on another device). A copy from before the deletion, like the sample a device from
+  before accounts added by itself, still follows the deletion.
+- **The rules check in `tests/e2e/cloud.e2e.mjs`** asks the Firestore emulator directly with each account's own
+  token: no account reads or writes another's items, nobody reads or writes the old `meta/owner` document (the
+  account it names included), and items of another kind, with a text `updatedAt` or of 1,000,000 characters are
+  refused.
+- **Open, for the owner:** signing in with a different account than the one a device remembers clears that device's
+  copy first (D35), and changes of the remembered account that haven't reached it yet are lost with it. The sign-out
+  warning (D36) doesn't cover this path ("Sign in again", where Google's account list lets you pick another account).
+  Taken after review as D42 (12.7), for the owner to confirm.
+
+### 12.7 After review: decisions taken while fixing (for the owner to confirm)
+
+A security, a mobile and a design review ran on the build. These are the decisions taken alone while fixing what they
+found; each has a check in `tests/e2e/cloud.e2e.mjs` (emulators), `tests/e2e/landing.e2e.mjs` or the unit tests.
+
+**D42. Another account's sign-in asks before it clears changes the remembered account hasn't got yet.** Amends D35.
+When the device's copy holds changes that haven't reached the remembered account (items and photos, as D36 counts
+them), the sign-in of a different account first asks: "This device has {n} changes for {remembered} that haven't
+reached that account yet. Remove them and continue as {new}? Cancel keeps them: sign in with {remembered} to save
+them." Cancel (or closing the question) signs the new account out again and changes nothing on the device; the
+sign-in button then says "Not signed in as {new}, so the {n} changes for {remembered} stay on this device. Sign in
+with {remembered} to save them." OK clears the copy as D35 says. With nothing waiting, nothing is asked. Google's
+account list picks out the remembered account (`login_hint`), and "Sign in again" adds "Your changes stay on this
+device until then" with the account's address. The decision is `accountOnSignIn` (`'ask'`) in
+`shared/utils/account.ts`. Why: "Sign in again", where Google lists every account in the browser, silently lost the
+ticks, notes and photos made while the session was gone, and so did another account after a forced offline sign-out.
+Left for the owner: keeping one device copy per account instead of clearing it (a larger change).
+
+**D43. The notes lists follow the account's trips.** The home and Notes list the notes of the trips the account
+holds, and the notes of no trip (the how-to). A new account sees only the how-to; "Try the sample trip" brings the
+sample's research, planning chat and illustrated page with it. A note's own page still opens from its link, and the
+landing page loads no notes. Why: on a stranger's private home the planning chat, which quotes the owner's messages,
+read as someone else's diary. Left for the owner: taking the personal chat and research out of the public build.
+
+**D44. A device's copy is one account's, down to the last write.** A trip screen opened on one copy writes nothing
+once that copy is removed (another account came in, or it was removed from this device), and never brings back the
+progress of a trip that is no longer on the device. A stop's note saves only what you type, and follows a newer note
+from another device, as the day journal does. A photo being saved or fetched while the copy goes is dropped. Only the
+photos a stop of the device's copy holds are backed up (a photo nothing holds stays on the device). "Sign out and
+remove from this device" forgets the account only once its photos are gone, so the next account's sign-in removes
+any left. Why: an open stop sheet copied one account's note into the next account, an untouched one wrote an older
+note back over a newer one, and one account's photos reached another's Storage four ways.
+
+Smaller changes, same review:
+
+- **"Try the sample trip" opens the live guide** (amends D37): on the sample's own dates Now is live; otherwise it
+  opens as a preview of the sample's second day at 16:40, the moment the landing page shows (before, a countdown;
+  after 12 October, a finished trip).
+- **A sign-in that never finished leaves nothing on.** At start, Firebase loads only for a remembered account or a
+  sign-in coming back from Google's page (Firebase's pending-redirect note in the tab's session storage); when that
+  return brings nobody, the device goes back to not loading it. A stalled network keeps the buttons busy for 12 s at
+  most, and a page the browser restores from its back-forward cache after leaving for Google's page gets its buttons
+  back.
+- **The data is described as it is:** "stored under your Google sign-in" and "your account in the cloud" (the
+  landing page's Private card, Settings, trip settings, the removal question, the how-to note), not "saved to your
+  Google account": the data lives in the app's Firebase project, not in the person's Google account. The hero's
+  "private to your Google account" stays (D38).
+- **The Firestore rules check an item's name and fields:** an item is named `{kind}-{ref}` and holds only `kind`,
+  `ref`, `json`, `updatedAt` and a boolean `deleted`. (Storage's content types stay `image/*`: a narrower list would
+  turn one odd file into "photo backup isn't switched on" for the rest of the visit.)
+- **The celebrations a device showed go with its copy** (D39's device-only record is removed with the copy).
+- **The home's header** keeps its four buttons at 44 px on every phone; below 375 px the logo stands alone.

@@ -3,21 +3,37 @@ import { liveGuide } from '#shared/utils/guide'
 import { planDays, summarize } from '#shared/utils/plan'
 import { fmtClock, tripMoment } from '#shared/utils/time'
 
-const { sorted } = useTrips()
+const cloud = useCloud()
+/** A device with no account and nobody signed in gets the landing page, and nothing from the device (D33, D38). */
+const landing = computed(() => !cloud.account.value && !cloud.signedIn.value)
+/** Who this device belongs to: the account signed in now, else the one it remembers (D34). */
+const me = computed(() => cloud.user.value ?? cloud.account.value)
+/** A remembered account whose session is gone: the app stays usable and asks to sign in again (D34). */
+const signInAgain = computed(() => !!cloud.account.value && !cloud.signedIn.value && cloud.status.value === 'signed-out')
+const busy = computed(() => cloud.status.value === 'signing-in' || cloud.status.value === 'starting')
+// Firebase loads ahead of the tap, so a desktop sign-in window opens inside it (D31).
+watch(signInAgain, (again) => {
+  if (again) void cloud.prepare()
+}, { immediate: true })
+
+const trips = useTrips()
+const { sorted } = trips
 const store = useProgressStore()
 const { now } = useClock()
 const { choice } = useTheme()
 const { $pwa } = useNuxtApp()
-const config = useAppConfig()
-const cloud = useCloud()
-const nudgeOff = useLocalStorage('travel:nudge:signin', false)
-const showNudge = computed(() => !cloud.user.value && (cloud.status.value === 'off' || cloud.status.value === 'signed-out') && !nudgeOff.value && !moved.value)
-// The GitHub Pages copy points to the app's home on Firebase once that's live.
-const moved = computed(() => config.firebaseLive && typeof location !== 'undefined' && location.hostname.endsWith('github.io'))
-const syncDot = computed(() => ({ synced: 'ok', syncing: 'busy', offline: 'warn', error: 'bad', 'not-owner': 'bad' } as Record<string, string>)[cloud.status.value] ?? '')
+const syncDot = computed(() => ({ 'synced': 'ok', 'syncing': 'busy', 'offline': 'warn', 'error': 'bad', 'signed-out': 'warn' } as Record<string, string>)[cloud.status.value] ?? '')
+const accountLabel = computed(() => {
+  const s = ({ 'synced': 'synced', 'syncing': 'syncing', 'offline': 'offline', 'error': 'not syncing', 'starting': 'connecting', 'signed-out': 'signed out' } as Record<string, string>)[cloud.status.value]
+  return s ? `Account: ${s}` : 'Account'
+})
 const notesStore = useNotes()
-notesStore.load()
-const latestNotes = computed(() => notesStore.notes.value.slice(0, 3))
+// The notes load for the signed-in home only (the landing page needs none of them), and list only those of the
+// account's trips and of no trip (D43).
+watch(landing, (l) => {
+  if (!l) void notesStore.load()
+}, { immediate: true })
+const latestNotes = computed(() => notesStore.visible.value.slice(0, 3))
 const tripTitle = (id?: string) => (id ? sorted.value.find(t => t.id === id)?.title : undefined)
 
 const cards = computed(() => sorted.value.map((trip) => {
@@ -68,11 +84,28 @@ function cycleTheme() {
   toast(`Theme: ${choice.value === 'auto' ? 'follow the phone' : choice.value}`)
 }
 
+/**
+ * Adds a copy of the sample trip (it keeps receiving updates to the plan) and opens it on Now (D37): on its own dates,
+ * live; otherwise as a preview of its second day at 16:40, the moment the landing page shows, so the live guide is
+ * what you see first (a countdown before the trip, a finished trip after it).
+ */
+async function trySample() {
+  const t = trips.addSample()
+  if (!t) {
+    toast('The sample trip isn’t available right now', { tone: 'warn' })
+    return
+  }
+  const day = t.days[1] ?? t.days[0]
+  const live = tripMoment(t, now.value).phase === 'during'
+  await navigateTo({ path: `/trips/${t.id}/now`, query: !live && day ? { at: `${day.date}T16:40` } : undefined })
+}
+
 useHead({ title: 'Travels' })
 </script>
 
 <template>
-  <div class="page home">
+  <LandingPage v-if="landing" />
+  <div v-else class="page home">
     <header class="home-top">
       <NuxtLink to="/" class="brand" aria-label="Travels home">
         <AppLogo :size="30" />
@@ -85,8 +118,8 @@ useHead({ title: 'Travels' })
         <button class="btn icon plain round" type="button" :aria-label="`Theme: ${choice}`" @click="cycleTheme">
           <AppIcon :name="themeIcon" />
         </button>
-        <NuxtLink v-if="cloud.user.value" to="/settings#account" class="btn icon plain round acct" :aria-label="`Account: ${cloud.status.value}`">
-          <img v-if="cloud.user.value.photo" :src="cloud.user.value.photo" alt="" referrerpolicy="no-referrer">
+        <NuxtLink v-if="me" to="/settings#account" class="btn icon plain round acct" :aria-label="accountLabel">
+          <img v-if="me.photo" :src="me.photo" alt="" referrerpolicy="no-referrer">
           <AppIcon v-else name="person" />
           <i v-if="syncDot" class="dot" :class="syncDot" />
         </NuxtLink>
@@ -96,24 +129,25 @@ useHead({ title: 'Travels' })
       </div>
     </header>
 
-    <div v-if="moved" class="card pad stack movedcard">
-      <b class="h3">Travels has a new home</b>
-      <p class="small muted">
-        It now lives at {{ config.appUrl.replace('https://', '').replace(/\/$/, '') }}, with Google sign-in, sync and photo backup.
-        <template v-if="!cloud.user.value">
-          To bring what you logged here, sign in here once first, then open the new address and sign in there.
-        </template>
-        <template v-else>
-          What you logged here is in your account; sign in at the new address to see it there.
-        </template>
-      </p>
-      <div class="row wrap">
-        <a class="btn primary sm" :href="config.appUrl">Open the new address<AppIcon name="ext" size="sm" /></a>
-        <button v-if="!cloud.user.value" class="btn ghost sm" type="button" @click="cloud.signIn()">
-          <AppIcon name="person" size="sm" />Sign in here first
-        </button>
+    <section v-if="signInAgain" class="card pad again" aria-labelledby="again-t">
+      <AppIcon name="cloudoff" class="again-i" />
+      <div class="stack tight grow1">
+        <p id="again-t" class="strong">
+          Sign in again to keep saving to your account.
+        </p>
+        <p class="small muted again-who">
+          Your changes stay on this device until then.<template v-if="me?.email">
+            Account: <b>{{ me.email }}</b>
+          </template>
+        </p>
+        <div>
+          <button class="btn primary sm" type="button" :disabled="busy" @click="cloud.signIn()">
+            <AppIcon name="person" size="sm" />{{ busy ? 'Signing in…' : 'Sign in with Google' }}
+          </button>
+        </div>
+        <p class="msg small" role="status">{{ cloud.message.value }}</p>
       </div>
-    </div>
+    </section>
 
     <div class="hello">
       <p class="kicker">
@@ -134,22 +168,6 @@ useHead({ title: 'Travels' })
         <span class="btn gold sm go">Open the live guide<AppIcon name="arrow" size="sm" /></span>
       </div>
     </NuxtLink>
-
-    <div v-if="showNudge && cards.length" class="card pad nudge">
-      <AppIcon name="cloud" class="nic" />
-      <div class="stack tight grow1">
-        <b>Keep your trips safe</b>
-        <span class="small muted">Sign in with Google to back up your trips, ticks, notes and photos, and to have them on any device.</span>
-        <div class="row wrap">
-          <button class="btn primary sm" type="button" @click="cloud.signIn()">
-            <AppIcon name="person" size="sm" />Sign in with Google
-          </button>
-          <button class="btn plain sm" type="button" @click="nudgeOff = true">
-            Not now
-          </button>
-        </div>
-      </div>
-    </div>
 
     <div v-if="totals.trips" class="stats card">
       <div><b class="num">{{ totals.trips }}</b><span>{{ totals.trips === 1 ? 'trip' : 'trips' }}</span></div>
@@ -188,11 +206,33 @@ useHead({ title: 'Travels' })
       </div>
     </section>
 
+    <section v-if="!cards.length" class="card firsttrip" aria-labelledby="first-t">
+      <div class="ft-art art-frame">
+        <SceneArt class="scene" scene="plane" tod="golden" label="A plane at golden hour" :lazy="false" />
+      </div>
+      <div class="ft-body">
+        <h2 id="first-t" class="h3">
+          No trips yet
+        </h2>
+        <p class="muted">
+          Plan your own, or look around the sample trip to Rome first.
+        </p>
+        <div class="ft-acts">
+          <NuxtLink to="/trips/new" class="btn primary">
+            <AppIcon name="plus" />Plan a trip
+          </NuxtLink>
+          <button class="btn ghost" type="button" @click="trySample">
+            <AppIcon name="sparkle" />Try the sample trip
+          </button>
+        </div>
+      </div>
+    </section>
+
     <section v-if="latestNotes.length">
       <div class="sec-h">
         <h2>Notes & chats</h2>
         <NuxtLink to="/notes" class="aside">
-          All {{ notesStore.notes.value.length }}
+          All {{ notesStore.visible.value.length }}
         </NuxtLink>
       </div>
       <div class="notes">
@@ -200,14 +240,8 @@ useHead({ title: 'Travels' })
       </div>
     </section>
 
-    <div v-if="!cards.length" class="card empty">
-      <AppIcon name="globe" />
-      <h3>No trips yet</h3>
-      <p>Plan one, or import a backup from another device.</p>
-    </div>
-
     <div class="actions">
-      <NuxtLink to="/trips/new" class="btn primary lg">
+      <NuxtLink v-if="cards.length" to="/trips/new" class="btn primary lg">
         <AppIcon name="plus" />New trip
       </NuxtLink>
       <NuxtLink to="/settings" class="btn ghost lg">
@@ -229,13 +263,21 @@ useHead({ title: 'Travels' })
 .acct .dot.warn { background: var(--warn); }
 .acct .dot.bad { background: var(--bad); }
 .acct .dot.busy { background: var(--gold); }
-.movedcard { margin: 8px 0 12px; border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
-.nudge { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
-.nudge .nic { color: var(--accent); flex: none; margin-top: 2px; }
+.again { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0 4px; border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.again-i { color: var(--warn); flex: none; margin-top: 2px; }
+.again-who b { overflow-wrap: anywhere; }
+.msg { padding: 8px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.msg:empty { display: none; }
 .grow1 { flex: 1; min-width: 0; }
-.home-top { display: flex; align-items: center; justify-content: space-between; padding: calc(4px + var(--safe-t)) 0 8px; }
-.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--accent); }
+/* Four buttons on every signed-in phone: they keep 44 px, the logo stays whole, and the word gives way first. */
+.home-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(4px + var(--safe-t)) 0 8px; }
+.home-top .row { flex: none; gap: 4px; }
+.home-top .row > * { flex: none; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 44px; min-height: 44px; text-decoration: none; color: var(--accent); }
+.brand :deep(.logo) { flex: none; }
 .brand b { font-size: 19px; letter-spacing: .24em; text-transform: uppercase; }
+@media (max-width: 389px) { .brand b { letter-spacing: .14em; } }
+@media (max-width: 374px) { .brand b { display: none; } }
 .hello { margin: 18px 0 16px; }
 .hello .h1 { margin-top: 4px; }
 .livecard { display: flex; align-items: flex-end; min-height: 260px; overflow: hidden; margin-bottom: 16px; }
@@ -251,6 +293,17 @@ useHead({ title: 'Travels' })
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .notes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 @media (max-width: 480px) { .notes { grid-template-columns: minmax(0, 1fr); } }
+.firsttrip { overflow: hidden; display: flex; flex-direction: column; margin-bottom: 8px; }
+.ft-art { height: 150px; }
+.ft-body { padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.ft-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.ft-acts .btn { flex: 1 1 auto; }
+@media (min-width: 720px) {
+  .firsttrip { flex-direction: row; }
+  .ft-art { width: 42%; height: auto; min-height: 210px; flex: none; }
+  .ft-body { justify-content: center; padding: 24px; }
+  .ft-acts .btn { flex: 0 1 auto; }
+}
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 @media (max-width: 480px) {
   .stats b { font-size: 18px; }

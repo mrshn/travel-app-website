@@ -11,6 +11,11 @@ interface Seen {
 
 /** For a browser that refuses storage: then each thing celebrates once per visit instead. */
 const memory = new Map<string, Seen>()
+/**
+ * Storage refused a read or a write in this visit, so `memory` stands in for it. While storage works, it alone counts:
+ * the record goes with the device's copy when another account's copy replaces it (useCloud).
+ */
+let refused = false
 
 /** The most a celebration says at once; beyond that it ends "And 5 more". */
 const MAX_PARTS = 3
@@ -25,6 +30,7 @@ function readAll(): Record<string, unknown> {
     return all && typeof all === 'object' && !Array.isArray(all) ? all as Record<string, unknown> : {}
   }
   catch {
+    refused = true
     return {}
   }
 }
@@ -37,7 +43,7 @@ function loadSeen(tripId: string): Seen | null {
     const rank = Number(s.rank)
     return { badges: strings(s.badges), rank: Number.isFinite(rank) ? rank : 1, sets: strings(s.sets) }
   }
-  return memory.get(tripId) ?? null
+  return refused ? memory.get(tripId) ?? null : null
 }
 
 function saveSeen(tripId: string, seen: Seen) {
@@ -47,7 +53,9 @@ function saveSeen(tripId: string, seen: Seen) {
     all[tripId] = seen
     localStorage.setItem(SEEN_KEY, JSON.stringify(all))
   }
-  catch { /* storage refused: memory keeps it for this visit */ }
+  catch {
+    refused = true // storage refused: memory keeps it for this visit
+  }
 }
 </script>
 

@@ -2,7 +2,7 @@
 
 A trip companion that tells you **what to do right now**, follows you on the map, and keeps track of **what you planned, what you did and what's left**, across all your trips.
 
-It ships with a full 5-day plan for **Rome, 8–12 October 2026** (first trip abroad, solo, social hostel) and you can add your own trips.
+Open **https://travela-emre.firebaseapp.com**, sign in with Google, and plan your own trips or try the sample: a full 5-day plan for **Rome, 8–12 October 2026** (first trip abroad, solo, social hostel).
 
 <p>
   <img src="docs/screenshots/now.webp" width="240" alt="The Now screen: today's money, the stop you should be at, time left, and when to leave for the next one">
@@ -73,28 +73,30 @@ A trip has five tabs, the same five as top tabs on a laptop: **Now**, **Plan**, 
 
 ## Your account, sync and offline
 
-- **Works without an account.** Trips and progress live on the device (`localStorage`), photos in IndexedDB, and everything works offline.
-- **Sign in with Google** (*Settings → Your account*) to keep a copy in your own Firebase project: trips and progress in Firestore, photos in Cloud Storage. Every device you sign in on stays in step; changes made offline sync when you're back online, and edits made on two devices are merged (ticks, ratings, notes and photos from both are kept, and costs and stamps are merged one by one, a deleted cost staying deleted).
-- **Only you.** The first Google account that signs in owns the app; the security rules (`firebase/`) refuse every other account. The setup script can also lock sign-up to your account.
+- **One address, with a front page.** The app lives at https://travela-emre.firebaseapp.com (`travela-emre.web.app` forwards there). A device with no account sees a landing page: what the app does, feature by feature, and **Sign in with Google**. Every other page needs an account.
+- **Any Google account, each one private.** Anyone can sign in with Google, and each account reads and writes only its own data: the security rules (`firebase/`) refuse everything else. On a phone or from the Home Screen, sign-in goes to Google's page and comes back; in a desktop browser it opens a small window (or goes to Google's page when the window is blocked).
+- **Saved to your account, kept on the device.** Trips and progress (ticks, ratings, notes, costs, stamps, bookings, packing, day notes and choices) are saved in Firestore, photos in Cloud Storage. Each device keeps a copy (`localStorage`, photos in IndexedDB), so the app opens and works offline. Every device you sign in on stays in step; changes made offline sync when you're back online, and edits made on two devices are merged (ticks, ratings, notes and photos from both are kept, and costs and stamps are merged one by one, a deleted cost staying deleted). Only each device's own settings stay on it alone, such as the look, the map choice, alerts and which celebrations it already showed.
+- **Nothing is added for you.** A new account starts empty, with **Plan a trip** and **Try the sample trip** (a copy of the Rome plan that keeps following the version in this repository).
+- **A device belongs to one account.** It remembers who signed in and opens straight into their trips, offline too. If the session has lapsed, the app keeps working and asks to *Sign in again to keep saving to your account*. **Sign out** returns to the front page and keeps the device's copy for when the same account signs back in; when changes haven't reached the account yet, it warns first. **Sign out and remove from this device** clears the copy. Signing in with a different account clears the device's copy first, then brings that account's own data; a device used before accounts existed brings its trips and progress into the first account that signs in on it.
 - **Google Maps**: the map uses Google's tiles (Map Tiles API) and the live guide asks Google (Routes API) for real walking and transit times, including which metro or bus to catch for "leave by". Offline, the guide falls back to its own estimates and the map to OpenStreetMap, showing the areas you looked at with OpenStreetMap on (the service worker keeps the tiles you viewed, never more, per the OpenStreetMap tile policy). To have the map offline, choose OpenStreetMap in *Settings → Map* before the trip and look around the areas you'll visit.
 - It's an installable PWA: add it to your home screen and it opens full screen.
 - **Back up** from *Settings → Export everything* if you want a file of your own; *Import a backup* merges it with what's on the device.
 
 ## Saving chats and trips from Claude
 
-Everything the app shows lives in this repository, so a chat can add to it:
+The notes and the trips that ship with the app live in this repository, so a chat can add to them:
 
 - **Notes** go in `content/notes/YYYY-MM-DD-slug.md` with a small front matter (title, date, kind, trip, summary, tags).
 - **Trips** go in `app/data/<trip>.ts` and are listed in `app/data/trips.ts`.
 
-The formats and rules (stable stop ids, real coordinates, what never to publish) are in **[docs/content-guide.md](docs/content-guide.md)**. After a push to `main` the site redeploys in about two minutes. Phones pick up trip changes by themselves: a trip nobody changed updates quietly; one changed on the phone gets an *Update / Keep mine* banner that keeps the person's ticks, notes, photos and own stops.
+The formats and rules (stable stop ids, real coordinates, what never to publish) are in **[docs/content-guide.md](docs/content-guide.md)**. After a push to `main` the site redeploys in about two minutes. A trip that ships with the app is never added to an account by itself: the first one in the list is the sample (**Try the sample trip** on an empty home), and *Settings → Try the sample trip* offers every one not on the device yet. A copy that came from one follows the newer versions pushed here: a copy nobody changed updates quietly; one changed on the phone gets an *Update / Keep mine* banner that keeps the person's ticks, notes, photos and own stops.
 
 ## Develop
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # unit tests (time, geo, plan, guide, notes, costs, places, game, sync, trip data)
+npm test           # unit tests (time, geo, plan, guide, notes, costs, places, game, sync, accounts, trip data)
 npm run typecheck
 npm run generate   # static site in .output/public
 ```
@@ -106,12 +108,13 @@ node tests/e2e/costs.e2e.mjs     # the Costs page, the cost pad and sheet, costs
 node tests/e2e/places.e2e.mjs    # Places, the place sheet, the map, the stop editor (--build adds the offline map)
 node tests/e2e/game.e2e.mjs      # tabs, header, More, Badges, celebrations, Progress
 node tests/e2e/day.e2e.mjs       # Now, Plan, bookings, packing, the driver card
+node tests/e2e/landing.e2e.mjs   # the landing page, sign-in required, the empty home, signing out, Settings
 node tests/e2e/ui.e2e.mjs        # across screens: lit tabs, sideways scroll, touch targets, contrast, offline map
 node tests/e2e/ui.e2e.mjs --build              # serves .output/public itself
 SHOTS=1 node tests/e2e/ui.e2e.mjs --build      # writes docs/screenshots/*.webp (needs cwebp)
 ```
 
-`tests/e2e/lib.mjs` holds their shared helpers (a phone, the seeded test state, a frozen clock, a static server for the build); run on its own it is a smoke test of every trip page.
+`tests/e2e/lib.mjs` holds their shared helpers (a phone that remembers a made-up account, or has none with `signedOut: true`; the seeded test state; a frozen clock; a static server for the build); run on its own it is a smoke test of every trip page, and checks that a device with no account stays on the landing page.
 
 Stack: Nuxt 4 (client-side SPA, static generation), Vue 3, VueUse, Leaflet with Google Map Tiles or OpenStreetMap tiles, Firebase (Auth, Firestore, Storage, Hosting), Google Routes API, idb-keyval, `@vite-pwa/nuxt`, Vitest, Playwright. The illustrations, stamps and badge seals are original hand-coded SVG, the illustrations lit for the time of day.
 
@@ -119,14 +122,16 @@ Stack: Nuxt 4 (client-side SPA, static generation), Vue 3, VueUse, Leaflet with 
 
 ```
 app/
-  pages/            index (all trips), trips/new, settings,
+  pages/            index (the landing page, or all trips once signed in), trips/new, settings,
                     trips/[id]/{now,plan,places,costs,more,map,progress,badges,bookings,packing,guide,notes,sos,settings}
-  components/       MapView (Leaflet), StopSheet, StopEditor, FeedbackEditor, CostPad, CostSheet, PlaceTile,
-                    PlaceSheet, StampMark, BadgeSeal, RankCard, GameHost (celebrations), HomeCard, DayStrip, …
+  middleware/       auth.global.ts: every page but the landing page needs an account
+  components/       LandingPage, AccountCard, MapView (Leaflet), StopSheet, StopEditor, FeedbackEditor, CostPad,
+                    CostSheet, PlaceTile, PlaceSheet, StampMark, BadgeSeal, RankCard, GameHost (celebrations),
+                    HomeCard, DayStrip, …
   composables/      useTrips, useProgress, useTripView, useTripActions (ticks, costs, stamps), useGame,
-                    useClock, useGeo, useLiveAlerts, usePhotos, useCloud (sign-in and sync),
+                    useClock, useGeo, useLiveAlerts, usePhotos, useCloud (sign-in, the device's account, sync),
                     useGoogleMaps (tiles and routes), …
-  lib/firebase.ts   Firebase, loaded only once you sign in
+  lib/firebase.ts   Firebase, loaded when a sign-in button shows or on a device with an account
   data/trips.ts     the trips that ship with the app (rome.ts is the Rome plan)
   data/notes.ts     loads content/notes/*.md
   utils/            illustration engine, icons, map helpers, UI helpers
@@ -134,7 +139,7 @@ shared/
   types/trip.ts     the data model
   utils/            time (trip clock, time zones), geo, plan (states, progress), guide (live guide), text,
                     costs (the ledger), places (sets and stamps), game (rank and badges),
-                    sync (what to upload, download or merge)
+                    sync (what to upload, download or merge), account (how sign-in opens, whose copy a device holds)
 tests/              Vitest (including checks of every trip's data); e2e/ has the browser checks, and
                     cloud.e2e.mjs runs against the Firebase emulators
 firebase/           Firestore and Storage security rules
@@ -146,18 +151,17 @@ docs/               content guide and screenshots
 
 ### Add a trip that ships with the app
 
-Create `app/data/<trip>.ts` exporting a `Trip` (see `shared/types/trip.ts`; `app/data/rome.ts` is a complete example) and add it to `SEED_TRIPS` in `app/data/trips.ts`. See [docs/content-guide.md](docs/content-guide.md). Seeded trips follow newer versions pushed here, and can be reset to the original from *Trip settings*.
+Create `app/data/<trip>.ts` exporting a `Trip` (see `shared/types/trip.ts`; `app/data/rome.ts` is a complete example) and add it to the end of `SEED_TRIPS` in `app/data/trips.ts` (the first trip there is the sample). See [docs/content-guide.md](docs/content-guide.md). Nothing is added to anyone's account by itself; copies people add follow newer versions pushed here, and can be reset to the original from *Trip settings*.
 
 Places sort themselves into sets and stops find their places by name, so a new trip needs nothing extra for the collection and the game. Two optional fields cover what the matching can't: `set` on a place (which set it belongs to) and `placeId` on a stop or an option (which place it is, so ticking it stamps that place).
 
 ## Deploy
 
-The workflow in `.github/workflows/deploy.yml` tests and builds on every push to `main`, then publishes:
+The app has one home, **Firebase Hosting**: https://travela-emre.firebaseapp.com (`travela-emre.web.app` forwards there). The workflow in `.github/workflows/deploy.yml` runs on every push to `main` (or by hand): unit tests, the type check and the static build, then it deploys the site with the Firestore and Storage security rules. GitHub signs in to Google without any stored key (Workload Identity Federation), and only this repository may deploy.
 
-- **Firebase Hosting** (the app's home, with sign-in and sync): https://travela-emre.firebaseapp.com. GitHub signs in to Google without any stored key (Workload Identity Federation) and deploys the site plus the Firestore and Storage security rules. This job runs once `.github/firebase-ready` exists.
-- **GitHub Pages**: https://mrshn.github.io/travel-app-website/, a copy that points to the Firebase address once it's live (`firebaseLive` in `app/app.config.ts`).
+`.github/workflows/cloud-tests.yml` runs sign-in, private accounts (two accounts can't read each other's data, and two accounts taking turns on one device never see each other's trips), two-device sync, offline merging (costs logged, edited and deleted on two devices included), photo backup and the security rules against the Firebase emulators.
 
-`.github/workflows/cloud-tests.yml` runs sign-in, two-device sync, offline merging (costs logged, edited and deleted on two devices included), photo backup and the security rules against the Firebase emulators.
+**GitHub Pages is no longer deployed.** The copy already published at https://mrshn.github.io/travel-app-website/ stays online on its last version until it's unpublished, and it can't reach anyone's account under the current rules. To take it down: the repository's **Settings → Pages**, the **…** menu next to *Your site is live at*, then **Unpublish site** (or set the source to **None**). Nothing publishes it again, as no workflow deploys to Pages any more. Anything logged only on that copy can come across as a file: its *Settings → Export everything*, then *Import a backup* at the new address.
 
 ### One-time Google Cloud setup
 
@@ -168,6 +172,8 @@ curl -sL https://raw.githubusercontent.com/mrshn/travel-app-website/main/scripts
 ```
 
 It signs you in with the Google account that owns the Firebase project (in its own gcloud profile), asks before linking a billing account (the Blaze plan, needed for photo storage and Google Maps; one person stays inside the free tiers), turns on Google sign-in, creates the database, the hosting site and the photo bucket, lets only this repository deploy, locks the Maps key to the app's addresses with daily caps, and adds a spending alert. Safe to run again.
+
+Any Google account can then sign in to the app, each one seeing only its own data. One option is off unless you set it: `TRAVELS_LOCK_SIGNUP=yes` stops new accounts from signing up, and existing accounts keep working.
 
 ## Credits
 

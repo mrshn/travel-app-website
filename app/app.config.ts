@@ -16,8 +16,6 @@ export default defineAppConfig({
   /** Google Maps Platform key (Map Tiles + Routes), locked to this app's addresses in Google Cloud. */
   mapsKey: 'AIzaSyCzkWA20wqmrvdgPwTtM0gpPWLK_FZa-P4',
 
-  /** The app's home on Firebase Hosting (sign-in works best there, including from the Home Screen). */
+  /** The app's one home, on Firebase Hosting (sign-in works best there, including from the Home Screen). */
   appUrl: 'https://travela-emre.firebaseapp.com/',
-  /** Set once Firebase Hosting is live, so the GitHub Pages copy points people there. */
-  firebaseLive: true,
 })

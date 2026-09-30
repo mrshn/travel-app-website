@@ -89,6 +89,21 @@ describe('deciding what to sync', () => {
     const untouched: CloudItem = { kind: 'trip', ref: 'x', json: fresh, updatedAt: 9 }
     expect(decide('trip', yours.json, untouched, undefined)).toEqual({ do: 'upload' })
   })
+
+  it('keeps a copy of a trip added after it was deleted elsewhere, and follows the deletion for one added before', () => {
+    // The account deleted its copy of the sample on 5 Oct (another device). This device never synced that trip.
+    const deletedAt = Date.parse('2026-10-05T12:00:00Z')
+    const tombstone: CloudItem = { kind: 'trip', ref: 'x', json: '', updatedAt: deletedAt, deleted: true }
+    const copy = (createdAt: string) => JSON.stringify({ id: 'x', title: 'Rome', seedId: 'x', edited: false, createdAt, updatedAt: '2026-10-06T09:00:00Z' })
+    // "Try the sample trip" after the deletion: a copy the traveller just asked for, never taken away.
+    expect(decide('trip', copy('2026-10-06T09:00:00Z'), tombstone, undefined)).toEqual({ do: 'upload' })
+    // The copy a device from before accounts added by itself (the seed's own date): the deletion wins, as before.
+    expect(decide('trip', copy(romeTrip.createdAt), tombstone, undefined)).toEqual({ do: 'delete-local' })
+    // A copy with no readable date counts as old.
+    expect(decide('trip', JSON.stringify({ id: 'x', edited: false }), tombstone, undefined)).toEqual({ do: 'delete-local' })
+    // Once this device agreed with the deletion, a copy added again uploads as it always did.
+    expect(decide('trip', copy('2026-10-06T09:00:00Z'), tombstone, { hash: '', updatedAt: deletedAt })).toEqual({ do: 'upload' })
+  })
 })
 
 /* ---------- costs and stamps (spec 5.6, 9.7) ---------- */

@@ -1119,7 +1119,7 @@ await test('A2 in light mode too, the stop sheet\'s grey chips and lines reach 4
   }
 })
 
-await test('The photo line follows the account: signed out, backed up, signed in as someone else, backup off', async () => {
+await test('The photo line follows the account: signed out, backed up, backup off', async () => {
   const ph = await open(`plan?day=fri&stop=${CASTEL}`)
   try {
     const { page } = ph
@@ -1143,9 +1143,6 @@ await test('The photo line follows the account: signed out, backed up, signed in
     }
     const on = await says('synced', 'on')
     assert(on === 'Photos are backed up to your account.', `signed in: ${on}`)
-    // Another Google account than the app's owner: nothing is kept in the cloud (Trip settings says so too).
-    const other = await says('not-owner', 'on')
-    assert(other === 'Photos stay on this device.', `not the owner: ${other}`)
     const off = await says('synced', 'unavailable')
     assert(off === 'Photos stay on this device.', `backup unavailable: ${off}`)
   }

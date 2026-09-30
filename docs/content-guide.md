@@ -1,13 +1,13 @@
 # Content guide: saving chats and trips to Travels
 
-Everything the app shows comes from this repository. There are two kinds of content:
+The notes and the trips that ship with the app come from this repository; what each person records stays in their own account in the app's cloud, under their Google sign-in. A note that names a trip (`trip:`) is listed for the accounts that have that trip; a note with no trip is listed for everyone. There are two kinds of content:
 
 | What | Where | Shows up as |
 |---|---|---|
-| **Notes**: research, tips, chat logs, links to pages | `content/notes/*.md` | *Notes & chats* (home screen, `/notes`, and each trip's **More → Notes & chats**) |
-| **Trips**: a full plan with days, stops, bookings… | `app/data/<trip>.ts`, listed in `app/data/trips.ts` | A trip on the home screen, with the tabs Now, Plan, Places, Costs and More |
+| **Notes**: research, tips, chat logs, links to pages | `content/notes/*.md` | *Notes & chats* for every signed-in account (home screen, `/notes`, and each trip's **More → Notes & chats**) |
+| **Trips**: a full plan with days, stops, bookings… | `app/data/<trip>.ts`, listed in `app/data/trips.ts` | A trip people can add to their account (the first one is **Try the sample trip**), with the tabs Now, Plan, Places, Costs and More |
 
-Pushing to `main` rebuilds the site (GitHub Actions → Firebase Hosting, plus a copy on Pages) in about two minutes: https://travela-emre.firebaseapp.com
+Pushing to `main` rebuilds the site (GitHub Actions → Firebase Hosting, its only home) in about two minutes: https://travela-emre.firebaseapp.com
 
 > **The repository is public.** Never save birth dates, passport or ID numbers, visa numbers, booking references, card details, personal phone numbers or emails, or a home address. Businesses' public contacts are fine. Ask before saving anything that feels private.
 
@@ -119,10 +119,10 @@ data a trip already has; two optional fields cover what the automatic matching m
 
    export const lisbonTrip: Trip = { id: 'lisbon-2026-11', seedId: 'lisbon-2026-11', … }
    ```
-2. Add it to `SEED_TRIPS` in `app/data/trips.ts`.
+2. Add it to the end of `SEED_TRIPS` in `app/data/trips.ts`: the first trip in that list is the sample that **Try the sample trip** adds.
 3. Run the checks (below). `tests/seeds.test.ts` checks every trip: unique ids, sane times and coordinates, valid options.
 
-How updates reach phones: the app fingerprints each trip. A copy nobody changed updates by itself; a copy changed on the phone gets an **Update / Keep mine** banner, and updating keeps the person's ticks, ratings, notes, photos, own stops and packing items. A new trip in `SEED_TRIPS` appears on every device.
+How updates reach phones: nothing is added to anyone's account by itself, and a trip in `SEED_TRIPS` reaches the people who add a copy of it (**Try the sample trip** on an empty home adds the first one; *Settings → Try the sample trip* offers every one not on the device yet). The copy keeps the trip's `seedId`, and the app fingerprints each trip: a copy nobody changed updates by itself; a copy changed on the phone gets an **Update / Keep mine** banner, and updating keeps the person's ticks, ratings, notes, photos, own stops and packing items.
 
 ---
 
@@ -136,4 +136,4 @@ npm run generate    # must build
 git add -A && git commit -m "…" && git push origin main
 ```
 
-Then watch the run: `https://api.github.com/repos/mrshn/travel-app-website/actions/runs?per_page=1` (status `completed`, conclusion `success`), and open https://travela-emre.firebaseapp.com/notes or the trip.
+Then watch the run: `https://api.github.com/repos/mrshn/travel-app-website/actions/runs?per_page=1` (status `completed`, conclusion `success`). Notes and trips show only to a signed-in account (a browser with no account sees the landing page at https://travela-emre.firebaseapp.com), so check the note or the trip in the app, signed in.

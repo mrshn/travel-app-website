@@ -247,9 +247,8 @@ try {
   })
 
   await run('N1 at 1280 px the top tabs show the same five, and the bottom bar is gone', async () => {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, timezoneId: 'Europe/Rome', serviceWorkers: 'block' })
-    await ctx.addInitScript(([p, id]) => localStorage.setItem('travel:progress:v1', JSON.stringify({ [id]: p })), [SEED, TRIP])
-    const page = await ctx.newPage()
+    // A desktop browser (no touch), signed in and holding the trip like every phone of these checks (lib.mjs).
+    const { ctx, page } = await phone(browser, { width: 1280, height: 800, isMobile: false, hasTouch: false, deviceScaleFactor: 1, progress: SEED })
     await live(page, FRI)
     await open(page, 'badges')
     const top = page.locator('nav.tabs-top a')
@@ -747,7 +746,7 @@ try {
     assert(data.includes('Everything lives in this browser on this device.'), data)
     // Signed in (not reachable without a Google account here), the other line shows: it is in the page's code.
     const src = readFileSync(join(ROOT, 'app/pages/trips/[id]/settings.vue'), 'utf8')
-    assert(/v-if="signedIn"[^>]*>\s*Everything is kept on this device and in your Google account\. Export a backup if you want a file of your own\./.test(src), 'the signed-in line is not in settings.vue')
+    assert(/v-if="signedIn"[^>]*>\s*Everything is kept on this device and in your account in the cloud\. Export a backup if you want a file of your own\./.test(src), 'the signed-in line is not in settings.vue')
     await ctx.close()
   })
 

@@ -11,7 +11,9 @@
 # Answers can also be given up front (for running it from Claude Code or another tool, where nobody
 # can type into the prompts):
 #   TRAVELS_BILLING_ACCOUNT=<billing account id>   link this billing account (the Blaze plan), or "skip"
-#   TRAVELS_LOCK_SIGNUP=yes                        after your first sign-in: no other Google account may sign up
+# Any Google account can sign in to the app, and each one sees only its own data. One option, off
+# unless you set it:
+#   TRAVELS_LOCK_SIGNUP=yes                        no new accounts can sign up; existing accounts keep working
 set -o pipefail # (no -u: macOS still ships bash 3.2)
 
 P=travela-emre                                    # Firebase / Google Cloud project id
@@ -185,22 +187,23 @@ if echo "$CONF" | grep -q '"authorizedDomains"'; then
       todo "Could not add mrshn.github.io to Authentication > Settings > Authorized domains"
     fi
   fi
-  # Once you have signed in to the app, nobody else needs an account.
+  # Any Google account may sign in: the security rules keep each account to its own data.
+  # The sign-up lock is optional and runs only when asked for (TRAVELS_LOCK_SIGNUP=yes).
   LOCKED=$(echo "$CONF" | js 'print(((d.get("client") or {}).get("permissions") or {}).get("disabledUserSignup", False))')
-  USERS=$(api -X POST "https://identitytoolkit.googleapis.com/v1/projects/$P/accounts:query" -d '{"returnUserInfo": false}' | js 'print(d.get("recordsCount", "0"))')
   if [ "$LOCKED" = "True" ]; then
-    ok "Locked to your account (no new sign-ups)"
-  elif [ "${USERS:-0}" -ge 1 ] 2>/dev/null; then
-    if [ -n "${TRAVELS_LOCK_SIGNUP:-}" ]; then REPLY=$TRAVELS_LOCK_SIGNUP
-    elif interactive; then ask "You have signed in to the app. Lock it so no other Google account can sign up? [Y/n]"
-    else REPLY=no; note "You've signed in to the app: run again with TRAVELS_LOCK_SIGNUP=yes to lock sign-up to your account."
-    fi
-    if [[ "$REPLY" =~ ^([Yy]|$) ]]; then
-      api -X PATCH "https://identitytoolkit.googleapis.com/admin/v2/projects/$P/config?updateMask=client.permissions.disabledUserSignup" \
-        -d '{"client": {"permissions": {"disabledUserSignup": true}}}' | grep -q 'disabledUserSignup' && ok "Locked to your account"
+    ok "Sign-up is locked: no new accounts can sign up; existing accounts keep working"
+  elif [[ "${TRAVELS_LOCK_SIGNUP:-}" =~ ^[Yy] ]]; then
+    USERS=$(api -X POST "https://identitytoolkit.googleapis.com/v1/projects/$P/accounts:query" -d '{"returnUserInfo": false}' | js 'print(d.get("recordsCount", "0"))')
+    if ! [ "${USERS:-0}" -ge 1 ] 2>/dev/null; then
+      todo "Sign-up not locked: nobody has signed in to the app yet, and a lock now would keep everyone out."
+    elif api -X PATCH "https://identitytoolkit.googleapis.com/admin/v2/projects/$P/config?updateMask=client.permissions.disabledUserSignup" \
+      -d '{"client": {"permissions": {"disabledUserSignup": true}}}' | grep -q 'disabledUserSignup'; then
+      ok "Sign-up locked: no new accounts can sign up; existing accounts keep working"
+    else
+      todo "Could not lock sign-up; run this again in a minute."
     fi
   else
-    note "Tip: after you first sign in to the app, run this again to lock sign-in to your account."
+    ok "Any Google account can sign in, and each one sees only its own data"
   fi
 fi
 

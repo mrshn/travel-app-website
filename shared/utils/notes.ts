@@ -86,6 +86,15 @@ export function sortNotes(notes: Note[]): Note[] {
   return [...notes].sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title))
 }
 
+/**
+ * The notes an account's lists show (spec D43): the notes of the trips it holds, and the notes that belong to no trip
+ * (the how-to). Another trip's notes (its research, its planning chat) stay out of an account that doesn't have it.
+ */
+export function notesFor(notes: readonly Note[], tripIds: Iterable<string>): Note[] {
+  const held = new Set(tripIds)
+  return notes.filter(n => !n.trip || held.has(n.trip))
+}
+
 export function headingId(text: string): string {
   return text
     .toLowerCase()

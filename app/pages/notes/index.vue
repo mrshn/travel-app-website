@@ -1,5 +1,6 @@
 <script setup lang="ts">
-const { notes, ready, load } = useNotes()
+// The notes of this account's trips, and those of no trip (spec D43).
+const { visible: notes, ready, load } = useNotes()
 const { repo, branch } = useAppConfig()
 await load()
 useHead({ title: 'Notes & chats · Travels' })
@@ -21,9 +22,9 @@ useHead({ title: 'Notes & chats · Travels' })
       </div>
     </header>
     <p class="muted intro">
-      Research, tips and chat logs saved from conversations with Claude. They live in
+      Research, tips and chat logs saved from conversations with Claude, with the notes of your trips. They live in
       <a :href="`https://github.com/${repo}/tree/${branch}/content/notes`" target="_blank" rel="noopener">content/notes</a>
-      in your GitHub project, so every save shows up here after the site redeploys.
+      in the app's GitHub project, so every save shows up here after the site redeploys.
     </p>
     <NoteList v-if="ready && notes.length" :notes="notes" show-trips />
     <div v-else-if="ready" class="card empty">

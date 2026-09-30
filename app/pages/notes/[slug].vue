@@ -11,7 +11,12 @@ const note = computed(() => get(String(route.params.slug)))
 const rendered = computed(() => (note.value ? renderMarkdown(note.value.body) : { html: '', toc: [] }))
 const toc = computed(() => rendered.value.toc.filter(t => t.depth === 2))
 const trip = computed(() => (note.value?.trip ? trips.value.find(t => t.id === note.value!.trip) : undefined))
-const back = computed(() => (typeof route.query.from === 'string' && route.query.from.startsWith('/') ? route.query.from : trip.value ? `/trips/${trip.value.id}/notes` : '/notes'))
+/** Where Back goes: `?from=` when it is a path of the app ("//elsewhere" and "/\elsewhere" are other sites). */
+const back = computed(() => {
+  const from = route.query.from
+  if (typeof from === 'string' && /^\/(?![/\\])/.test(from)) return from
+  return trip.value ? `/trips/${trip.value.id}/notes` : '/notes'
+})
 const base = useRuntimeConfig().app.baseURL
 const pageHref = computed(() => {
   const l = note.value?.link

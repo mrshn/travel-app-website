@@ -27,10 +27,10 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
-      title: 'Travels',
+      title: 'Travels: your trip, live',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-        { name: 'description', content: 'Your travel companion: follow the plan live on a map, tick off what you did, leave feedback and see what is left.' },
+        { name: 'description', content: 'Your trip plan, live on your phone: what to do now, when to leave, what you have spent, and a stamp for every place you visit. Free, private to your Google account, and it works offline.' },
         { name: 'theme-color', content: '#8A1538' },
         // A personal travel app: keep it out of search engines.
         { name: 'robots', content: 'noindex, nofollow' },
@@ -63,8 +63,10 @@ export default defineNuxtConfig({
     },
     workbox: {
       navigateFallback: base,
-      // Standalone pages kept in public/archive open as themselves, not as the app.
-      navigateFallbackDenylist: [/\/archive\//],
+      // Standalone pages kept in public/archive open as themselves, not as the app. So do Firebase's own pages under
+      // /__/ (/__/auth/handler and /__/auth/iframe carry Google sign-in on the app's own address): served as the app,
+      // a sign-in would come back to the landing page instead.
+      navigateFallbackDenylist: [/\/archive\//, /^\/__\//],
       globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
       globIgnores: ['**/archive/**'],
       runtimeCaching: [

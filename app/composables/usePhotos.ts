@@ -1,7 +1,5 @@
 import { uid } from '#shared/utils/plan'
-import { deletePhoto, readPhoto, writePhoto } from '~/lib/photoStore'
-
-const urls = new Map<string, string>()
+import { deletePhoto, photoUrls as urls, readPhoto, writePhoto } from '~/lib/photoStore'
 
 async function shrink(file: Blob, max = 1600, quality = 0.82): Promise<Blob> {
   try {
@@ -23,14 +21,24 @@ async function shrink(file: Blob, max = 1600, quality = 0.82): Promise<Blob> {
   }
 }
 
-/** Photos are kept on this device and, when you're signed in, backed up to your account. */
+/**
+ * Photos are kept on this device and, when you're signed in, backed up to your account. A photo being saved or fetched
+ * while this device's copy is removed (another account signing in, spec D44) is dropped: it belonged to that copy.
+ */
 export function usePhotos() {
   const cloud = useCloud()
+  const copy = useCopyEpoch()
 
   async function add(file: Blob): Promise<string> {
+    const started = copy.value
     const blob = await shrink(file)
+    if (copy.value !== started) throw new Error('This device changed accounts while the photo was being saved')
     const id = uid('ph')
     await writePhoto(id, blob)
+    if (copy.value !== started) {
+      await deletePhoto(id).catch(() => {})
+      throw new Error('This device changed accounts while the photo was being saved')
+    }
     cloud.photoAdded(id)
     return id
   }
@@ -39,21 +47,29 @@ export function usePhotos() {
   async function url(id: string): Promise<string | null> {
     const hit = urls.get(id)
     if (hit) return hit
+    const started = copy.value
     let blob = await readPhoto(id)
     if (!blob) {
       const got = await cloud.fetchPhoto(id)
-      if (!got) return null
+      if (!got || copy.value !== started) return null
       if (typeof got === 'string') return got
       blob = got
       await writePhoto(id, blob).catch(() => {})
+      if (copy.value !== started) {
+        await deletePhoto(id).catch(() => {})
+        return null
+      }
     }
+    if (copy.value !== started) return null
     const u = URL.createObjectURL(blob)
     urls.set(id, u)
     return u
   }
 
   async function remove(id: string) {
+    const started = copy.value
     await deletePhoto(id)
+    if (copy.value !== started) return
     cloud.photoRemoved(id)
     const u = urls.get(id)
     if (u) URL.revokeObjectURL(u)

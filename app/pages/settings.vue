@@ -5,7 +5,6 @@ import { mergeProgress } from '#shared/utils/sync'
 
 const trips = useTrips()
 const store = useProgressStore()
-const cloud = useCloud()
 const gmaps = useGoogleMaps()
 const mapNote = computed(() => {
   if (!gmaps.key) return 'Google Maps isn’t set up in this copy of the app.'
@@ -66,22 +65,15 @@ async function importFile(e: Event) {
   }
 }
 
-const missingSeeds = computed(() => SEED_TRIPS.filter(s => !trips.get(s.id)))
-function restore(id: string) {
-  const t = trips.restoreSeed(id)
-  if (t) toast(`${t.title} is back`, { tone: 'ok' })
+/** Sample trips not on this device yet (a copy keeps the sample's id and seedId). */
+const samples = computed(() => SEED_TRIPS.filter(s => !trips.trips.value.some(t => t.id === s.id || (!!t.seedId && t.seedId === (s.seedId ?? s.id)))))
+function addSample(seedId: string) {
+  const t = trips.addSample(seedId)
+  if (!t) return
+  const id = t.id
+  toast(`Added the sample trip: ${t.title}`, { tone: 'ok', action: { label: 'Open', run: () => void navigateTo(`/trips/${id}/now`) } })
 }
 
-async function wipe() {
-  const signedIn = !!cloud.user.value
-  if (!confirm(signedIn
-    ? 'Delete all trips and everything you logged on this device? You\'ll be signed out; your Google account keeps its copy.'
-    : 'Delete all trips and everything you logged on this device?')) return
-  if (signedIn) await cloud.forget()
-  trips.replaceAll([])
-  store.value = {}
-  toast('All data deleted')
-}
 useHead({ title: 'Settings · Travels' })
 </script>
 
@@ -134,13 +126,13 @@ useHead({ title: 'Settings · Travels' })
 
     <section class="card pad stack">
       <h2 class="h3">
-        Backup
+        Your data
       </h2>
-      <p v-if="cloud.user.value" class="small muted">
-        Everything is also kept in your Google account (above). A backup file is still handy as an extra copy you keep yourself.
+      <p class="small muted">
+        Everything you record is saved to your account in the cloud and kept on this device for offline use: trips, ticks, notes, costs, stamps and photos.
       </p>
-      <p v-else class="small muted">
-        Your trips, ticks, ratings and notes are stored in this browser only. Sign in above to keep them in your account, or export a backup file and import it on another device. Photos stay on the device they were taken on.
+      <p class="small muted">
+        The look, the map and alerts are set on each device. A backup file is an extra copy you keep yourself.
       </p>
       <div class="row wrap">
         <button class="btn primary" type="button" @click="exportAll">
@@ -153,14 +145,14 @@ useHead({ title: 'Settings · Travels' })
       </div>
     </section>
 
-    <section v-if="missingSeeds.length" class="card pad stack">
+    <section v-if="samples.length" class="card pad stack">
       <h2 class="h3">
-        Sample trips
+        Try the sample trip
       </h2>
-      <div v-for="s in missingSeeds" :key="s.id" class="row between">
+      <div v-for="s in samples" :key="s.id" class="row between">
         <span>{{ s.title }} · {{ fmtRange(s.start, s.end) }}</span>
-        <button class="btn sm" type="button" @click="restore(s.seedId ?? s.id)">
-          <AppIcon name="refresh" size="sm" />Bring back
+        <button class="btn sm" type="button" :aria-label="`Add the sample trip: ${s.title}`" @click="addSample(s.seedId ?? s.id)">
+          <AppIcon name="plus" size="sm" />Add
         </button>
       </div>
     </section>
@@ -172,15 +164,6 @@ useHead({ title: 'Settings · Travels' })
       <p class="small muted">
         Add Travels to your home screen (Share → Add to Home Screen on iPhone, or the install prompt in Chrome). It then opens full screen and works offline; OpenStreetMap areas you've looked at stay saved for when you have no signal.
       </p>
-    </section>
-
-    <section class="card pad stack">
-      <h2 class="h3">
-        Start over
-      </h2>
-      <button class="btn danger" type="button" @click="wipe">
-        <AppIcon name="trash" size="sm" />Delete all data on this device
-      </button>
     </section>
   </div>
 </template>

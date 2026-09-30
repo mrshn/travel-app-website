@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watchDebounced } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 
 const props = defineProps<{ stopId: string, title?: string }>()
 const v = useTripView()
@@ -8,32 +8,48 @@ const cloud = useCloud()
 
 const fb = computed(() => v.progress.value.feedback[props.stopId])
 
-const note = ref(fb.value?.note ?? '')
 const busy = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
-
-function flushNote(id: string) {
-  const saved = v.progress.value.feedback[id]?.note ?? ''
-  if (saved !== note.value) v.setFeedback(id, { note: note.value })
-}
-
-watch(() => props.stopId, (_id, old) => {
-  if (old) flushNote(old)
-  note.value = fb.value?.note ?? ''
-})
-onBeforeUnmount(() => flushNote(props.stopId))
-
-watchDebounced(note, (n) => {
-  if ((fb.value?.note ?? '') !== n) v.setFeedback(props.stopId, { note: n })
-}, { debounce: 450 })
+let open = true
 
 /**
- * Where your photos are kept: backed up while signed in (unless the account can't take them), else only here.
- * Signed in with a Google account that isn't the app's owner keeps nothing in the cloud (as Trip settings says).
+ * The stop's note. The text in the box belongs to `noteStop`; what you type is saved to that stop shortly after you
+ * stop, and at once when you move to another stop or close the sheet. Only typing is saved: a box you didn't touch
+ * never writes its copy back over a newer note (from another phone through the cloud), and shows that newer note
+ * instead. (A trip screen writes nothing more once this device's copy is removed: useProgress.)
  */
+const note = ref('')
+const noteStop = ref('')
+let noteTyped = false
+function saveNote() {
+  const id = noteStop.value
+  if (!id || !noteTyped) return
+  noteTyped = false
+  if ((v.progress.value.feedback[id]?.note ?? '') !== note.value) v.setFeedback(id, { note: note.value })
+}
+const saveNoteSoon = useDebounceFn(saveNote, 450)
+function typedNote() {
+  noteTyped = true
+  void saveNoteSoon()
+}
+watch(() => props.stopId, (id) => {
+  saveNote()
+  noteStop.value = id
+  note.value = v.progress.value.feedback[id]?.note ?? ''
+  noteTyped = false
+}, { immediate: true })
+watch(() => (noteStop.value ? v.progress.value.feedback[noteStop.value]?.note ?? '' : ''), (saved) => {
+  if (!noteTyped) note.value = saved
+})
+onBeforeUnmount(() => {
+  open = false
+  saveNote()
+})
+
+/** Where your photos are kept: backed up while signed in (unless the account can't take them), else only here. */
 const photoLine = computed(() => {
   if (!cloud.user.value) return 'Photos stay on this phone until you sign in.'
-  return cloud.status.value !== 'not-owner' && cloud.photoBackup.value === 'on' ? 'Photos are backed up to your account.' : 'Photos stay on this device.'
+  return cloud.photoBackup.value === 'on' ? 'Photos are backed up to your account.' : 'Photos stay on this device.'
 })
 
 const rating = computed({
@@ -59,7 +75,8 @@ async function addPhotos(e: Event) {
     toast(ids.length > 1 ? `${ids.length} photos saved` : 'Photo saved', { tone: 'ok' })
   }
   catch {
-    toast('Could not save that photo', { tone: 'warn' })
+    // (Closed meanwhile, say by another account signing in: that photo went with the old copy, nothing to say.)
+    if (open) toast('Could not save that photo', { tone: 'warn' })
   }
   finally {
     busy.value = false
@@ -101,7 +118,7 @@ const ratingWords = ['', 'Not for me', 'Meh', 'Good', 'Great', 'Unforgettable']
     </div>
     <label class="field">
       <span>Notes</span>
-      <textarea v-model="note" class="textarea" rows="3" placeholder="What stood out? Who did you meet? A tip for next time…" />
+      <textarea v-model="note" class="textarea" rows="3" placeholder="What stood out? Who did you meet? A tip for next time…" @input="typedNote" @blur="saveNote" />
     </label>
     <div class="photos">
       <span class="label">Photos</span>
