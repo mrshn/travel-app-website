@@ -15,7 +15,7 @@ import { loadTrip, romeCopy } from './lib.mjs'
 const ROOT = '.output/public'
 const PORT = 4173
 const BASE = `http://127.0.0.1:${PORT}/`
-const TRIP = 'rome-2026-10'
+const TRIP = 'rome-sample'
 /** The app's own address (Firebase's authDomain), stood in for by this build in the sign-in method checks. */
 const OWN = 'https://travela-emre.firebaseapp.com/'
 const FIRESTORE = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080'
@@ -528,7 +528,7 @@ await step('W4 on one device alice signs out and bob signs in: bob never sees al
 
   await watchFrames(A, { texts: [EDITED, trip.subtitle], titles: [EDITED], booking: 'hostel' })
   await signIn(A, 'bob')
-  await until(A, () => window.__travelsTest.trips.value.some(t => t.id === 'lisbon-2026-11') && window.__travelsTest.trips.value.some(t => t.id === 'rome-2026-10'))
+  await until(A, id => window.__travelsTest.trips.value.some(t => t.id === 'lisbon-2026-11') && window.__travelsTest.trips.value.some(t => t.id === id), TRIP)
   await A.page.waitForTimeout(1500)
   const frames = await seen(A)
   // The watch works: until bob signed in, it saw alice's copy held (hidden) on the device.

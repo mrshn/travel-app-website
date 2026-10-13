@@ -23,7 +23,7 @@ import { chromium } from 'playwright'
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 
-export const TRIP = 'rome-2026-10'
+export const TRIP = 'rome-sample'
 
 /** Where the app runs (always ends with "/"). useBase() changes it, for example to a served build. */
 export let BASE = withSlash(process.env.TRAVELS_URL || 'http://127.0.0.1:3000/')
@@ -208,7 +208,7 @@ async function settle(page) {
 
 /**
  * A path in the app: "/settings" is app-level (from the root), "plan?day=fri" is a section of the trip.
- * Returns the path with the app's base, e.g. "/trips/rome-2026-10/plan?day=fri".
+ * Returns the path with the app's base, e.g. "/trips/rome-sample/plan?day=fri".
  */
 export function tripPath(path) {
   const rel = path.startsWith('/') ? path.slice(1) : `trips/${TRIP}/${path}`

@@ -33,10 +33,10 @@ describe('geo', () => {
   })
 
   it('reads coordinates from text and map links', () => {
-    expect(parseLatLng('41.9055, 12.5026')).toEqual({ lat: 41.9055, lng: 12.5026 })
+    expect(parseLatLng('41.9062, 12.5055')).toEqual({ lat: 41.9062, lng: 12.5055 })
     expect(parseLatLng('https://www.google.com/maps/place/X/@41.8986,12.4769,17z')).toEqual(pantheon)
     expect(parseLatLng('https://maps.google.com/?q=41.8902,12.4922')).toEqual(colosseum)
-    expect(parseLatLng('Via Palestro 51')).toBeNull()
+    expect(parseLatLng('Via Marsala 5')).toBeNull()
   })
 
   it('builds directions links', () => {
