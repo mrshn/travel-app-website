@@ -78,7 +78,9 @@ export const useSocial = createGlobalState(() => {
   const signedInAs = computed<PersonRef | null>(() => {
     const u = memoryMode ? cloud.account.value : cloud.user.value
     if (!u) return null
-    return { uid: u.uid, name: u.name || u.email.split('@')[0] || 'Traveller', photo: u.photo ?? null }
+    // Profiles hold at most 60 characters of name (the rules check it).
+    const name = (u.name || u.email.split('@')[0] || 'Traveller').trim().slice(0, 60)
+    return { uid: u.uid, name, photo: u.photo ?? null }
   })
 
   const backend = shallowRef<SocialBackend | null>(null)

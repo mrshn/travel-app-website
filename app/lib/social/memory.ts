@@ -555,6 +555,7 @@ export function createMemoryBackend(meIn: PersonRef | null): SocialBackend {
       const g = cloud.groups[gid]
       if (!g || g.owner !== uid()) throw new SocialError('denied')
       if (who === g.owner) throw new SocialError('invalid')
+      if (!g.roles[who]) throw new SocialError('not-found')
       if (role) g.roles[who] = role
       else {
         delete g.roles[who]
@@ -663,6 +664,8 @@ export function createMemoryBackend(meIn: PersonRef | null): SocialBackend {
       const m = cloud.meetups[mid]
       if (!m) throw new SocialError('not-found')
       if (m.host !== uid()) throw new SocialError('denied')
+      const title = patch.title ?? m.title
+      if (!title.trim() || tooLong(title, 80) || tooLong(patch.note ?? m.note, 280)) throw new SocialError('invalid')
       Object.assign(m, clone(patch), { updatedAt: now() })
       changed()
     },
