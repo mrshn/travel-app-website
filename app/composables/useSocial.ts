@@ -119,6 +119,19 @@ export const useSocial = createGlobalState(() => {
     return (await import('~/lib/social/firestore')).createFirestoreBackend(fb, person)
   }
 
+  // ---------- live lists (declared before anything that fills them) ----------
+  const friendships = ref<Friendship[]>([])
+  const incoming = ref<FriendRequest[]>([])
+  const outgoing = ref<FriendRequest[]>([])
+  const inbox = ref<InboxItem[]>([])
+  const people = ref<Record<string, Profile>>({})
+  const cards = ref<Record<string, FriendCard | null>>({})
+  const myCard = ref<FriendCard | null>(null)
+  const feed = ref<FeedItem[]>([])
+  const friendToken = ref('')
+  let shared: string[] = []
+  const cardsReadAt = new Map<string, number>()
+
   // ---------- the backend for the account ----------
   let madeFor: string | null = null
   let making = 0
@@ -162,19 +175,6 @@ export const useSocial = createGlobalState(() => {
     const m = me.value
     if (m && backend.value?.me?.uid === m.uid) backend.value.setMe({ name: m.name, photo: m.photo })
   })
-
-  // ---------- live lists ----------
-  const friendships = ref<Friendship[]>([])
-  const incoming = ref<FriendRequest[]>([])
-  const outgoing = ref<FriendRequest[]>([])
-  const inbox = ref<InboxItem[]>([])
-  const people = ref<Record<string, Profile>>({})
-  const cards = ref<Record<string, FriendCard | null>>({})
-  const myCard = ref<FriendCard | null>(null)
-  const feed = ref<FeedItem[]>([])
-  const friendToken = ref('')
-  let shared: string[] = []
-  const cardsReadAt = new Map<string, number>()
 
   function loadCache(uid: string | null) {
     const c = uid ? readCache(uid) : {}

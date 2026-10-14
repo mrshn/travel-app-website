@@ -169,6 +169,8 @@ useHead({ title: 'Travels' })
       </div>
     </NuxtLink>
 
+    <HomeDeadlines />
+
     <div v-if="totals.trips" class="stats card">
       <div><b class="num">{{ totals.trips }}</b><span>{{ totals.trips === 1 ? 'trip' : 'trips' }}</span></div>
       <div><b class="num">{{ totals.days }}</b><span>days</span></div>
@@ -176,6 +178,8 @@ useHead({ title: 'Travels' })
       <div><b class="num">{{ totals.avg ? totals.avg.toFixed(1) : '–' }}</b><span>avg rating</span></div>
       <div><b class="num">{{ totals.photos }}</b><span>photos</span></div>
     </div>
+
+    <HomeFriends />
 
     <section v-if="upcoming.length">
       <div class="sec-h">

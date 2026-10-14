@@ -97,7 +97,15 @@ export const ICONS: Record<string, string> = {
  "laurel": "<path d=\"M12 20.5c-4.5-.8-7.6-4.6-7.6-9.3 0-1.7.4-3.3 1.1-4.7M12 20.5c4.5-.8 7.6-4.6 7.6-9.3 0-1.7-.4-3.3-1.1-4.7\"/><path d=\"M5.5 6.5c1.3.3 2 1.3 2 2.6-1.3-.1-2.2-1-2-2.6zM4.4 11c1.4 0 2.4.9 2.6 2.2-1.4.1-2.5-.8-2.6-2.2zM5.6 15.4c1.4-.3 2.6.4 3 1.6-1.3.4-2.6-.3-3-1.6zM18.5 6.5c-1.3.3-2 1.3-2 2.6 1.3-.1 2.2-1 2-2.6zM19.6 11c-1.4 0-2.4.9-2.6 2.2 1.4.1 2.5-.8 2.6-2.2zM18.4 15.4c-1.4-.3-2.6.4-3 1.6 1.3.4 2.6-.3 3-1.6z\"/>",
  "stamp": "<path d=\"M9.5 3.5h5l-.8 5.5h-3.4z\"/><path d=\"M5 12a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5z\"/><path d=\"M4 17.5h16M6 20.5h12\"/>",
  "medal": "<circle cx=\"12\" cy=\"14.5\" r=\"5.5\"/><path d=\"M8.6 10.2 6 3.5h4l2 4.5 2-4.5h4l-2.6 6.7\"/>",
- "backspace": "<path d=\"M9 5h11v14H9l-6-7z\"/><path d=\"M12.5 9.5l5 5M17.5 9.5l-5 5\"/>"
+ "backspace": "<path d=\"M9 5h11v14H9l-6-7z\"/><path d=\"M12.5 9.5l5 5M17.5 9.5l-5 5\"/>",
+ "share": "<path d=\"M12 3.5v11M7.5 8 12 3.5 16.5 8\"/><path d=\"M5 12.5v6.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6.5\"/>",
+ "send": "<path d=\"M20.5 3.5 10 14\"/><path d=\"M20.5 3.5 14 20.5l-4-6.5-6.5-4z\"/>",
+ "bell": "<path d=\"M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z\"/><path d=\"M10 20.5a2 2 0 0 0 4 0\"/>",
+ "qr": "<rect x=\"4\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"14\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\"/><rect x=\"4\" y=\"14\" width=\"6\" height=\"6\" rx=\"1\"/><path d=\"M14 14h2.5v2.5H14zM20 14v.01M14 20h.01M17.5 17.5H20V20h-2.5z\"/>",
+ "userplus": "<circle cx=\"10\" cy=\"8\" r=\"3.5\"/><path d=\"M3.5 20.5a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6\"/>",
+ "link": "<path d=\"M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1\"/><path d=\"M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1\"/>",
+ "hand": "<path d=\"M8 13V6.5a1.5 1.5 0 0 1 3 0V11M11 10.5v-6a1.5 1.5 0 0 1 3 0v6M14 10.5V6a1.5 1.5 0 0 1 3 0v7c0 4-2.5 7.5-6.5 7.5-2.7 0-4.4-1.4-5.6-3.6L3.4 13.6a1.5 1.5 0 0 1 2.6-1.5L8 15\"/>",
+ "lifebuoy": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"3.5\"/><path d=\"M9.5 9.5 6 6M14.5 9.5 18 6M14.5 14.5 18 18M9.5 14.5 6 18\"/>"
 }
 
 /** Names used in trip data that map to another icon. */
@@ -114,7 +122,13 @@ export const ICON_ALIAS: Record<string, string> = {
  "settings": "sliders",
  "journal": "book",
  "money": "euro",
- "ferry": "route"
+ "ferry": "route",
+ "together": "users",
+ "friends": "users",
+ "invite": "userplus",
+ "meetup": "hand",
+ "claim": "doc",
+ "changed": "lifebuoy"
 }
 
 export function iconSvg(name: string | undefined): string {

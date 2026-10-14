@@ -190,6 +190,25 @@ export function tapGuard(ms = 500): (e?: Event) => boolean {
   }
 }
 
+/**
+ * Hands a link on: the phone's share sheet where there is one (WhatsApp, Messages, a hostel chat), else copies it.
+ * 'cancelled' when the person closed the share sheet.
+ */
+export async function shareLink(data: { title?: string, text?: string, url: string }): Promise<'shared' | 'copied' | 'cancelled' | 'failed'> {
+  const nav = typeof navigator !== 'undefined' ? navigator as Navigator & { canShare?: (d: ShareData) => boolean } : null
+  const payload: ShareData = { title: data.title, text: data.text || undefined, url: data.url }
+  if (nav?.share && (!nav.canShare || nav.canShare(payload))) {
+    try {
+      await nav.share(payload)
+      return 'shared'
+    }
+    catch (e) {
+      if ((e as Error)?.name === 'AbortError') return 'cancelled'
+    }
+  }
+  return (await copyText(data.url)) ? 'copied' : 'failed'
+}
+
 export function downloadFile(name: string, content: string, type = 'application/json') {
   const blob = new Blob([content], { type })
   const url = URL.createObjectURL(blob)

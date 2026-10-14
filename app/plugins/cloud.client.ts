@@ -20,8 +20,9 @@ export default defineNuxtPlugin(() => {
     if (out && path !== '/' && !socialPublicPath(path)) void router.replace('/')
   })
 
-  // Emulator builds (tests) expose the stores so a test can drive two "devices".
-  if (useRuntimeConfig().public.firebaseEmulators) {
+  // Emulator builds and memory builds (tests) expose the stores so a test can drive two "devices" or act for others.
+  const pub = useRuntimeConfig().public
+  if (pub.firebaseEmulators || pub.socialBackend === 'memory') {
     const trips = useTrips()
     Object.assign(window, {
       __travelsTest: {
