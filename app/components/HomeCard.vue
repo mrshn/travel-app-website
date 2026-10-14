@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Day } from '#shared/types/trip'
 import { directionsUrl, fmtDistance, haversine, travelEstimate, walkMinutes, type LatLng } from '#shared/utils/geo'
-import { fmtDuration } from '#shared/utils/time'
+import { fmtClock, fmtDuration, zoned } from '#shared/utils/time'
+import { groupErrorLine } from './GroupNotice.vue'
 
 /**
  * "Getting back", the late-night card on Now: the way home, the card for the taxi driver and a taxi number,
@@ -58,6 +59,55 @@ const distance = computed(() => {
 })
 
 const show = computed(() => !!home.value || !!driverLines.value.length || !!taxi.value)
+
+// ---------- home safe (docs/design/2026-10-14-together.md, 5.4) ----------
+const tg = useTripGroup()
+const { real } = useClock()
+/** The time on the trip's clock, as people at home read it ("01:45"). */
+function clockNow(): string {
+  const tz = trip.value?.timezone
+  return fmtClock(tz ? zoned(real.value, tz).minutes : real.value.getHours() * 60 + real.value.getMinutes())
+}
+/** You already told the group tonight (in the last 12 hours). */
+const toldGroup = computed(() => {
+  const s = tg.me.value ? tg.statusOf(tg.me.value.uid) : null
+  return !!s && s.kind === 'home' && real.value.getTime() - s.at < 12 * 3_600_000
+})
+const telling = ref(false)
+/** A group trip: your status says so, and the chat hears it. A solo trip: a line to send through the phone's share sheet. */
+async function homeSafe() {
+  if (telling.value) return
+  if (!tg.isGroup.value) {
+    void shareHomeSafe(`Home safe, ${clockNow()}.`)
+    return
+  }
+  telling.value = true
+  try {
+    await tg.setStatus({ kind: 'home', text: 'Home safe' })
+    toast('Your group knows you\'re home safe.', { tone: 'ok' })
+  }
+  catch (e) {
+    toast(groupErrorLine(e), { tone: 'warn' })
+  }
+  finally {
+    telling.value = false
+  }
+}
+/** Text only, through the phone's share sheet; where there is none, copied. */
+async function shareHomeSafe(text: string) {
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
+  if (nav.share && (!nav.canShare || nav.canShare({ text }))) {
+    try {
+      await nav.share({ text })
+      return
+    }
+    catch (e) {
+      if ((e as Error)?.name === 'AbortError') return
+    }
+  }
+  if (await copyText(text)) toast(`Copied “${text}” Paste it in a message.`, { tone: 'ok' })
+  else toast(`Couldn't share. Send “${text}” to someone yourself.`, { tone: 'warn' })
+}
 </script>
 
 <template>
@@ -90,6 +140,20 @@ const show = computed(() => !!home.value || !!driverLines.value.length || !!taxi
         <AppIcon name="phone" size="sm" />Call a taxi · {{ taxiNumber }}
       </a>
     </div>
+    <div class="hc-safe">
+      <p v-if="tg.isGroup.value && toldGroup" class="small hc-line">
+        <AppIcon name="check" size="sm" /><span>You told the group you're home safe.</span>
+      </p>
+      <p v-else-if="tg.isGroup.value" class="small muted">
+        Back already? Tell the group.
+      </p>
+      <p v-else class="small muted">
+        Back already? Let someone know.
+      </p>
+      <button class="btn ok" type="button" @click="homeSafe">
+        <AppIcon :name="tg.isGroup.value ? 'check' : 'share'" size="sm" />{{ tg.isGroup.value ? 'I\'m home safe' : 'Let someone know' }}
+      </button>
+    </div>
     <DriverCard v-model:open="driver" :lines="driverLines" />
   </section>
 </template>
@@ -110,4 +174,7 @@ const show = computed(() => !!home.value || !!driverLines.value.length || !!taxi
 .hc-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .hc-acts .btn { flex: 1 1 auto; }
 .hc-acts .call { flex-basis: 100%; }
+.hc-safe { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--c-night) 22%, var(--line)); }
+.hc-safe p { flex: 1 1 160px; }
+.hc-safe .btn { flex: 1 1 auto; }
 </style>
