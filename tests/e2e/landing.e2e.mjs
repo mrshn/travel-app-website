@@ -24,10 +24,10 @@ const flat = s => String(s ?? '').replace(/\s+/g, ' ').trim()
 const EM_DASH = String.fromCharCode(0x2014)
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-/** The seven jobs of the landing page's feature cards, in order (spec D38). */
+/** The jobs of the landing page's feature cards, in order (spec D38, and Together of docs/design/2026-10-14-together.md). */
 const FEATURES = [
   ['now', 'Now'], ['plan', 'Plan'], ['places', 'Places'], ['costs', 'Costs'], ['badges', 'Badges and ranks'],
-  ['offline', 'Offline and on every device'], ['private', 'Private'],
+  ['together', 'Together'], ['offline', 'Offline and on every device'], ['private', 'Private'],
 ]
 
 /**
@@ -244,7 +244,7 @@ try {
       const label = `${size.name}${dark ? ', dark' : ''}`
       const extra = size.phone ? {} : { isMobile: false, hasTouch: false, deviceScaleFactor: 1 }
       const d = await device({ signedOut: true, width: size.width, height: size.height, dark, ...extra })
-      await check(`W2 landing at ${label}: no sideways scroll, targets of 44 px, text at 4.5:1, all seven features, one sign-in button above the fold, only the app's own address asked`, async () => {
+      await check(`W2 landing at ${label}: no sideways scroll, targets of 44 px, text at 4.5:1, all eight features, one sign-in button above the fold, only the app's own address asked`, async () => {
         await open(d.page)
         await d.page.evaluate(() => document.fonts.ready)
         const fold = await d.page.evaluate(() => {

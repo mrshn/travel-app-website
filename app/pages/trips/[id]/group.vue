@@ -87,7 +87,7 @@ useHead({ title: computed(() => (title.value ? `Together · ${title.value} · Tr
             Together
           </h1>
         </div>
-        <GroupFaces v-if="people.length" :people="people" :max="4" :size="32" label="In this trip" />
+        <AvatarStack v-if="people.length" :people="people" :max="4" :size="32" label="In this trip" />
         <NuxtLink v-if="tg.canEdit.value" :to="{ query: { ...route.query, invite: '1' } }" class="btn sm primary inv">
           <AppIcon name="userplus" size="sm" />Invite
         </NuxtLink>

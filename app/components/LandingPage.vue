@@ -230,7 +230,7 @@ useHead({ title: 'Travels: your trip, live' })
           </div>
         </article>
 
-        <article class="card fcard wide" aria-labelledby="landing-together">
+        <article class="card fcard wide" data-feature="together" aria-labelledby="landing-together">
           <div class="ftext">
             <h3 id="landing-together" class="fname">
               <AppIcon name="users" size="sm" />Together

@@ -22,7 +22,7 @@ const unread = computed(() => tg.unread.value)
 
 <template>
   <NuxtLink v-if="show" :to="{ path: `/trips/${v.id.value}/group`, query: { tab: 'chat' } }" class="card gstrip">
-    <GroupFaces v-if="others.length" :people="others" :max="3" :size="28" label="In this trip" />
+    <AvatarStack v-if="others.length" :people="others" :max="3" :size="28" label="In this trip" />
     <span v-else class="gs-ic" aria-hidden="true"><AppIcon name="users" size="sm" /></span>
     <span class="gs-t">
       <span class="gs-line">{{ line || 'Group chat' }}</span>

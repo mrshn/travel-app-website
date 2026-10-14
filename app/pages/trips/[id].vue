@@ -177,13 +177,13 @@ useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` :
     <StopSheet />
     <PlaceSheet />
     <StopEditor />
+    <ClaimSheet />
     <CostSheet />
     <ShareSheet />
     <InviteSheet />
     <MeetupSheet />
     <MetSheet />
     <PlansChangedSheet />
-    <ClaimSheet />
     <GameHost />
   </div>
   <div v-else class="page">

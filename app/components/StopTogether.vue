@@ -85,7 +85,7 @@ async function sendToChat() {
     <ul v-if="rows.length" class="who">
       <li v-for="r in rows" :key="r.going">
         <b class="w-l">{{ r.label }}</b>
-        <GroupFaces :people="r.people" :max="5" :size="26" :label="r.label" />
+        <AvatarStack :people="r.people" :max="5" :size="26" :label="r.label" />
         <span class="small muted w-n">{{ names(r.people) }}</span>
       </li>
     </ul>

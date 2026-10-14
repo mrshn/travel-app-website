@@ -201,5 +201,5 @@ function done() {
 
 <style>
 /* Over any other sheet whatever order the shell mounts them in: a claim (spec 5.13) is mounted after this sheet. */
-.sheet-wrap:has(> .sheet .cost-sheet) { z-index: 2001; }
+/* Stacking: BottomSheet puts the sheet opened last on top (a cost sheet over a claim sheet). */
 </style>

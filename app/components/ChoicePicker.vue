@@ -75,7 +75,7 @@ const count = (n: number) => `${n} ${n === 1 ? 'vote' : 'votes'}`
         </span>
         <span class="t">{{ c.title }}</span>
         <span v-if="group && votersOf(c.id).length" class="votes">
-          <GroupFaces :people="votersOf(c.id)" :max="4" :size="22" label="Voted for it" />
+          <AvatarStack :people="votersOf(c.id)" :max="4" :size="22" label="Voted for it" />
           <span class="small vn tnum">{{ count(votersOf(c.id).length) }}</span>
         </span>
         <ul v-if="c.id === chosen && c.lines?.length && !compact" class="lines">

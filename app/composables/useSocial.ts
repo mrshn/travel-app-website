@@ -96,7 +96,8 @@ export const useSocial = createGlobalState(() => {
   })
 
   const state = computed<SocialState>(() => {
-    if (!signedInAs.value) return cloud.account.value ? 'signed-out' : 'off'
+    // A remembered account whose session Firebase is still picking up is on its way, not signed out.
+    if (!signedInAs.value) return cloud.account.value ? (cloud.status.value === 'starting' || cloud.status.value === 'signing-in' ? 'loading' : 'signed-out') : 'off'
     if (!online.value) return 'offline'
     if (error.value) return 'error'
     return backend.value ? 'ready' : 'loading'
@@ -275,18 +276,21 @@ export const useSocial = createGlobalState(() => {
 
   // ---------- people ----------
   const asking = new Map<string, Promise<Profile | null>>()
-  /** Someone's public card: from memory, else read once (null when it can't be read). */
-  function person(uid: string): Promise<Profile | null> {
+  /** When each card was last read on this device (a friend's new handle or bio shows after a while). */
+  const peopleReadAt = new Map<string, number>()
+  /** Someone's public card: from memory (read again after 10 minutes, or now with `fresh`), else read once. */
+  function person(uid: string, fresh = false): Promise<Profile | null> {
     const have = people.value[uid]
-    if (have) return Promise.resolve(have)
+    if (have && !fresh && Date.now() - (peopleReadAt.get(uid) ?? 0) < CARD_TTL_MS) return Promise.resolve(have)
     const b = backend.value
-    if (!b || !ready.value) return Promise.resolve(null)
+    if (!b || !ready.value) return Promise.resolve(have ?? null)
     let p = asking.get(uid)
     if (!p) {
       p = b.getProfile(uid).then((x) => {
+        peopleReadAt.set(uid, Date.now())
         if (x) people.value = { ...people.value, [uid]: x }
-        return x
-      }, () => null).finally(() => asking.delete(uid))
+        return x ?? have ?? null
+      }, () => have ?? null).finally(() => asking.delete(uid))
       asking.set(uid, p)
     }
     return p

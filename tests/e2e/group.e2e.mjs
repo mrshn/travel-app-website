@@ -888,7 +888,7 @@ try {
       'app/pages/trips/[id]/group.vue', 'app/pages/j/[token].vue', 'app/components/InviteSheet.vue', 'app/components/TogetherButton.vue',
       'app/components/NowGroupStrip.vue', 'app/components/StopTogether.vue', 'app/components/ChoicePicker.vue', 'app/components/StopRow.vue',
       'app/components/HomeCard.vue', 'app/components/StopEditor.vue', 'app/components/GroupChat.vue', 'app/components/GroupPeople.vue',
-      'app/components/GroupDecide.vue', 'app/components/GroupNotice.vue', 'app/components/GroupFaces.vue', 'app/components/GroupWhereButton.vue',
+      'app/components/GroupDecide.vue', 'app/components/GroupNotice.vue', 'app/components/AvatarStack.vue', 'app/components/GroupWhereButton.vue',
       'app/components/ChatMessage.vue', 'app/components/ChatComposer.vue', 'app/components/ChatStopPicker.vue', 'tests/e2e/group.e2e.mjs',
     ]
     const bad = files.filter(f => readFileSync(join(ROOT, f), 'utf8').includes(EM_DASH))

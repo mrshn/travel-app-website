@@ -352,7 +352,7 @@ try {
   })
 
   // N4 and G8: the More hub.
-  await run('N4 /more groups Get ready, Find your way and Help and settings, with no Places row', async () => {
+  await run('N4 /more groups Together, Find your way, Get ready, If plans change and Help and settings, with no Places row', async () => {
     const { ctx, page } = await device(browser)
     await open(page, 'more')
     const groups = await page.locator('.grp').evaluateAll(els => els.map(g => ({
@@ -360,11 +360,17 @@ try {
       rows: [...g.querySelectorAll('a.mrow b')].map(b => b.textContent.trim()),
       heights: [...g.querySelectorAll('a.mrow')].map(a => a.getBoundingClientRect().height),
     })))
-    const want = { 'Get ready': ['Bookings', 'Packing'], 'Find your way': ['Map', 'Guide', 'Notes & chats'], 'Help and settings': ['SOS', 'Trip settings'] }
-    assert(groups.length === 3, `groups: ${groups.map(g => g.title)}`)
+    const want = {
+      'Together': ['Plan with friends', 'Share this plan', 'Meet people'],
+      'Get ready': ['Bookings', 'Packing'],
+      'Find your way': ['Map', 'Guide', 'Notes & chats'],
+      'If plans change': ['Plans changed', 'Claims'],
+      'Help and settings': ['SOS', 'Trip settings'],
+    }
+    assert(groups.length === 5, `groups: ${groups.map(g => g.title)}`)
     for (const g of groups) assert(JSON.stringify(g.rows) === JSON.stringify(want[g.title]), `${g.title}: ${g.rows}`)
-    // During the trip Find your way comes first.
-    assert(groups[0].title === 'Find your way', `first group: ${groups[0].title}`)
+    // During the trip: Together, then Find your way before Get ready.
+    assert(JSON.stringify(groups.map(g => g.title)) === JSON.stringify(['Together', 'Find your way', 'Get ready', 'If plans change', 'Help and settings']), `order: ${groups.map(g => g.title)}`)
     assert(groups.every(g => g.heights.every(h => h >= 56)), `row heights: ${groups.map(g => g.heights)}`)
     assert(!(await page.locator('a.mrow', { hasText: /^\s*Places\b/ }).count()), 'a Places row is there')
     const map = page.locator('a.mrow', { hasText: 'Map' })
@@ -377,11 +383,11 @@ try {
     await ctx.close()
   })
 
-  await run('N4 before the trip, Get ready comes first', async () => {
+  await run('N4 before the trip, Get ready comes right after Together', async () => {
     const { ctx, page } = await device(browser, { at: '2026-09-30T12:00' })
     await open(page, 'more')
-    const first = (await page.locator('.grp h2').first().textContent()).trim()
-    assert(first === 'Get ready', `first group: ${first}`)
+    const titles = (await page.locator('.grp h2').allTextContents()).map(t => t.trim())
+    assert(titles[0] === 'Together' && titles[1] === 'Get ready', `groups: ${titles}`)
     await ctx.close()
   })
 

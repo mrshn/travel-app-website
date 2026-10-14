@@ -23,7 +23,7 @@ const label = computed(() => {
     <AppIcon name="userplus" />
   </NuxtLink>
   <NuxtLink v-else :to="to" class="tgb faces" :aria-label="label" :title="label">
-    <GroupFaces v-if="people.length" :people="people" :max="3" :size="24" />
+    <AvatarStack v-if="people.length" :people="people" :max="3" :size="24" />
     <AppIcon v-else name="users" />
     <span v-if="unread" class="unread-dot" aria-hidden="true" />
   </NuxtLink>

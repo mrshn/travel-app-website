@@ -131,8 +131,8 @@ export const useGroups = createGlobalState(() => {
     watchers.clear()
     for (const u of latestWatchers.values()) u()
     latestWatchers.clear()
+    // The screens on show keep their entries (and counts): they subscribe again on the next backend.
     for (const u of liveSubs.values()) u.stop()
-    liveSubs.clear()
     docs.value = new Map()
     pointers.value = []
   }

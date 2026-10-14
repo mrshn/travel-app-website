@@ -39,7 +39,7 @@ const going = computed(() => (tg.isGroup.value && !props.stop.minor ? tg.goingFo
         <span v-if="feedback?.photos?.length" class="chip"><AppIcon name="camera" />{{ feedback.photos.length }}</span>
         <span v-if="feedback?.note" class="chip" title="Has a note"><AppIcon name="chat" /></span>
         <span v-if="stop.custom" class="chip t-plain">Added by you</span>
-        <GroupFaces v-if="going.length" class="going" :people="going" :max="3" :size="22" label="In" />
+        <AvatarStack v-if="going.length" class="going" :people="going" :max="3" :size="22" label="In" />
       </span>
     </button>
     <button

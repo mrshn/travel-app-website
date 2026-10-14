@@ -19,14 +19,14 @@ const names = computed(() => {
 </script>
 
 <template>
-  <span v-if="people.length" class="stack" role="img" :aria-label="label ? `${label}: ${names}` : names" :style="{ '--s': `${size}px` }">
+  <span v-if="people.length" class="avs" role="img" :aria-label="label ? `${label}: ${names}` : names" :style="{ '--s': `${size}px` }">
     <Avatar v-for="p in shown" :key="p.uid ?? p.name" :person="p" :size="size" ring />
     <span v-if="more" class="more num" aria-hidden="true">+{{ more }}</span>
   </span>
 </template>
 
 <style scoped>
-.stack { display: inline-flex; align-items: center; flex: none; }
-.stack > :deep(.av) + :deep(.av), .stack > .more { margin-left: calc(var(--s) * -.28); }
+.avs { display: inline-flex; align-items: center; flex: none; }
+.avs > .av + .av, .avs > .more { margin-left: calc(var(--s) * -.28); }
 .more { display: inline-grid; place-items: center; min-width: var(--s); height: var(--s); padding: 0 5px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); font-size: calc(var(--s) * .44); font-weight: 600; box-shadow: 0 0 0 2px var(--surface); }
 </style>

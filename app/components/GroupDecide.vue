@@ -84,7 +84,7 @@ const names = (uids: string[]) => people(uids).map(p => socialFirstName(p.name))
               <b>{{ n.stop.title }}</b>
               <span v-if="n.going.in.length || n.going.maybe.length" class="n-who">
                 <template v-if="n.going.in.length">
-                  <GroupFaces :people="people(n.going.in)" :max="4" :size="22" label="In" />
+                  <AvatarStack :people="people(n.going.in)" :max="4" :size="22" label="In" />
                   <span class="small">In: {{ names(n.going.in) }}</span>
                 </template>
                 <span v-if="n.going.maybe.length" class="small muted">Maybe: {{ names(n.going.maybe) }}</span>
