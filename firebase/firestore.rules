@@ -1,7 +1,14 @@
 rules_version = '2';
 
 // Travels: any Google account can sign in, and each account reads and writes only its own trips and progress.
-// Everything else is denied (the old meta/owner document stays as it is: nothing reads it any more).
+// The social layer (docs/design/2026-10-14-together.md, 6.1) adds friends, posts, group trips, meetups and plan links:
+// each document is written by the person it belongs to and read by the people it is for. Everything else is denied
+// (the old meta/owner document stays as it is: nothing reads it any more).
+//
+// Kept in mind: the rules may make 10 get()/exists() calls per document written and 20 per batch (the app writes
+// copies to friends' feeds 10 at a time); every query the app makes is on one field (no composite indexes); and the
+// `<name>Fields()` and `<name>Needs()` lists below are what app/lib/social/firestoreDocs.ts writes
+// (tests/socialcloud.test.ts compares them).
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner(uid) {
@@ -21,6 +28,817 @@ service cloud.firestore {
         && request.resource.data.json.size() < 1000000
         && request.resource.data.updatedAt is int
         && (!('deleted' in request.resource.data) || request.resource.data.deleted is bool);
+    }
+
+    // ---------- helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // A document holding every field it needs and nothing else.
+    function shape(d, needs, fields) {
+      return d is map && d.keys().hasAll(needs) && d.keys().hasOnly(fields);
+    }
+
+    function str(v, lo, hi) {
+      return v is string && v.size() >= lo && v.size() <= hi;
+    }
+
+    // An optional text field: absent, or text of at most `hi` characters.
+    function optStr(d, key, hi) {
+      return !(key in d) || str(d[key], 0, hi);
+    }
+
+    function optNum(d, key) {
+      return !(key in d) || d[key] is number;
+    }
+
+    function nameOk(v) {
+      return str(v, 1, 100);
+    }
+
+    // A photo is a link (Google's, or one uploaded), or null for initials.
+    function photoOk(v) {
+      return v == null || str(v, 1, 2048);
+    }
+
+    function timeOk(v) {
+      return v is int && v >= 0;
+    }
+
+    function uidOk(v) {
+      return str(v, 1, 128);
+    }
+
+    // Links anyone holding them may use (invites, meetups, plan links) have ids nobody can guess.
+    function tokenOk(v) {
+      return v is string && v.matches('^[A-Za-z0-9_-]{16,64}$');
+    }
+
+    // Friends: the friendship's id is both uids, sorted, joined by "_".
+    function pairId(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+
+    function isFriend(a, b) {
+      return exists(/databases/$(database)/documents/friendships/$(pairId(a, b)));
+    }
+
+    // A group trip, and whether you are in it.
+    function tripData(gid) {
+      return get(/databases/$(database)/documents/trips/$(gid)).data;
+    }
+
+    function isMember(gid) {
+      return signedIn() && request.auth.uid in tripData(gid).roles;
+    }
+
+    function isOrganiser(gid) {
+      return signedIn() && tripData(gid).owner == request.auth.uid;
+    }
+
+    // ---------- shapes ----------
+
+    function sceneFields() {
+      return ['scene', 'tod'];
+    }
+
+    function sceneOk(c) {
+      return shape(c, sceneFields(), sceneFields()) && str(c.scene, 0, 80) && str(c.tod, 0, 20);
+    }
+
+    function personFields() {
+      return ['name', 'photo'];
+    }
+
+    function personOk(p) {
+      return shape(p, personFields(), personFields()) && nameOk(p.name) && photoOk(p.photo);
+    }
+
+    function pinFields() {
+      return ['lat', 'lng', 'acc', 'name'];
+    }
+
+    function pinNeeds() {
+      return ['lat', 'lng'];
+    }
+
+    // One place on the map, as a chat message or a status sends it.
+    function pinOk(p) {
+      return shape(p, pinNeeds(), pinFields()) && p.lat is number && p.lng is number && optNum(p, 'acc') && optStr(p, 'name', 200);
+    }
+
+    // ---------- profiles and handles: any signed-in account reads them, you write your own ----------
+
+    function profileFields() {
+      return ['uid', 'name', 'photo', 'handle', 'bio', 'homeCity', 'updatedAt'];
+    }
+
+    function profileNeeds() {
+      return ['uid', 'name', 'photo', 'updatedAt'];
+    }
+
+    // The handle on a profile is one handles/ gives to that account (written in the same batch, hence getAfter).
+    function profileOk(d, uid) {
+      return shape(d, profileNeeds(), profileFields())
+        && d.uid == uid
+        && str(d.name, 1, 60)
+        && photoOk(d.photo)
+        && optStr(d, 'bio', 160)
+        && optStr(d, 'homeCity', 60)
+        && timeOk(d.updatedAt)
+        && (!('handle' in d) || getAfter(/databases/$(database)/documents/handles/$(d.handle)).data.uid == uid);
+    }
+
+    match /profiles/{uid} {
+      allow get: if signedIn();
+      allow create, update: if isOwner(uid) && profileOk(request.resource.data, uid);
+    }
+
+    // A handle is held by one account; the profile naming it is written in the same batch.
+    match /handles/{handle} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && handle.matches('^[a-z0-9_.]{3,20}$')
+        && !handle.matches('^[._].*$')
+        && !handle.matches('^.*[._]$')
+        && !handle.matches('^.*[.][.].*$')
+        && getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('handle', '') == handle;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------- your trips, for friends: you and your friends read it ----------
+
+    function cardFields() {
+      return ['uid', 'showTrips', 'trips', 'updatedAt'];
+    }
+
+    function cardOk(d, uid) {
+      return shape(d, cardFields(), cardFields())
+        && d.uid == uid
+        && d.showTrips is bool
+        && d.trips is list
+        && d.trips.size() <= 20
+        && (d.showTrips || d.trips.size() == 0)
+        && timeOk(d.updatedAt);
+    }
+
+    match /cards/{uid} {
+      allow get: if isOwner(uid) || (signedIn() && isFriend(uid, request.auth.uid));
+      allow create, update: if isOwner(uid) && cardOk(request.resource.data, uid);
+      allow delete: if isOwner(uid);
+    }
+
+    // ---------- invite links: anyone with the token reads one; only its maker resets it ----------
+
+    function inviteFields() {
+      return ['token', 'kind', 'from', 'fromName', 'fromPhoto', 'createdAt', 'revoked', 'trip', 'role', 'tripTitle', 'tripDestination', 'tripStart', 'tripEnd', 'tripCover'];
+    }
+
+    function inviteNeeds() {
+      return ['token', 'kind', 'from', 'fromName', 'fromPhoto', 'createdAt'];
+    }
+
+    function inviteOk(d, token) {
+      return shape(d, inviteNeeds(), inviteFields())
+        && d.token == token
+        && tokenOk(token)
+        && d.from == request.auth.uid
+        && nameOk(d.fromName)
+        && photoOk(d.fromPhoto)
+        && timeOk(d.createdAt)
+        && d.get('revoked', false) == false
+        && (d.kind == 'friend' ? !d.keys().hasAny(['trip', 'role', 'tripTitle', 'tripDestination', 'tripStart', 'tripEnd', 'tripCover'])
+          : (d.kind == 'trip' && tripInviteOk(d)));
+    }
+
+    // A trip invite comes from the trip's organiser or an editor, and lets people in as editors or viewers.
+    function tripInviteOk(d) {
+      return uidOk(d.trip)
+        && d.role in ['editor', 'viewer']
+        && optStr(d, 'tripTitle', 200)
+        && optStr(d, 'tripDestination', 200)
+        && optStr(d, 'tripStart', 32)
+        && optStr(d, 'tripEnd', 32)
+        && (!('tripCover' in d) || sceneOk(d.tripCover))
+        && tripData(d.trip).roles.get(request.auth.uid, '') in ['owner', 'editor'];
+    }
+
+    match /invites/{token} {
+      allow get: if true;
+      allow list: if signedIn() && resource.data.from == request.auth.uid;
+      allow create: if signedIn() && inviteOk(request.resource.data, token);
+      allow update: if signedIn()
+        && resource.data.from == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['revoked'])
+        && request.resource.data.revoked == true;
+    }
+
+    // ---------- friends: two people who are friends, and requests ----------
+
+    function friendshipFields() {
+      return ['id', 'members', 'via', 'createdAt'];
+    }
+
+    function friendshipOk(d, pair) {
+      return shape(d, friendshipFields(), friendshipFields())
+        && d.id == pair
+        && d.members is list
+        && d.members.size() == 2
+        && uidOk(d.members[0])
+        && uidOk(d.members[1])
+        && d.members[0] < d.members[1]
+        && pair == d.members[0] + '_' + d.members[1]
+        && request.auth.uid in d.members
+        && d.via is string
+        && timeOk(d.createdAt)
+        && friendVia(d.members[0] == request.auth.uid ? d.members[1] : d.members[0], d.via);
+    }
+
+    // How two people became friends: the other's friend link (one they made and haven't reset), or their request.
+    function friendVia(other, via) {
+      return via == 'request'
+        ? exists(/databases/$(database)/documents/requests/$(other + '_' + request.auth.uid))
+        : (tokenOk(via) && friendLinkOf(get(/databases/$(database)/documents/invites/$(via)), other));
+    }
+
+    function friendLinkOf(inv, maker) {
+      return inv != null
+        && inv.data.kind == 'friend'
+        && inv.data.from == maker
+        && inv.data.get('revoked', false) == false;
+    }
+
+    // Its id says who is in it (friendshipOk makes sure), so a member may read it, or learn it doesn't exist.
+    match /friendships/{pair} {
+      allow get: if signedIn() && request.auth.uid in pair.split('_');
+      allow list: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && friendshipOk(request.resource.data, pair);
+      allow delete: if signedIn() && request.auth.uid in pair.split('_');
+    }
+
+    function requestFields() {
+      return ['id', 'from', 'to', 'fromName', 'fromPhoto', 'at'];
+    }
+
+    function requestOk(d, rid) {
+      return shape(d, requestFields(), requestFields())
+        && d.id == rid
+        && d.from == request.auth.uid
+        && uidOk(d.to)
+        && d.to != request.auth.uid
+        && rid == d.from + '_' + d.to
+        && nameOk(d.fromName)
+        && photoOk(d.fromPhoto)
+        && timeOk(d.at);
+    }
+
+    // Its id is "{from}_{to}" (requestOk makes sure): either of them reads it or deletes it.
+    match /requests/{rid} {
+      allow get: if signedIn() && request.auth.uid in rid.split('_');
+      allow list: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      allow create, update: if signedIn() && requestOk(request.resource.data, rid);
+      allow delete: if signedIn() && request.auth.uid in rid.split('_');
+    }
+
+    // ---------- posts: read by their audience (the author and friends); copies in each reader's feed ----------
+
+    function postFields() {
+      return ['id', 'kind', 'text', 'photo', 'trip', 'place', 'link', 'recap', 'author', 'authorName', 'authorPhoto', 'audience', 'likes', 'at'];
+    }
+
+    function postNeeds() {
+      return ['id', 'kind', 'text', 'author', 'authorName', 'authorPhoto', 'audience', 'likes', 'at'];
+    }
+
+    function feedFields() {
+      return ['id', 'kind', 'text', 'photo', 'trip', 'place', 'link', 'recap', 'author', 'authorName', 'authorPhoto', 'at'];
+    }
+
+    function feedNeeds() {
+      return ['id', 'kind', 'text', 'author', 'authorName', 'authorPhoto', 'at'];
+    }
+
+    function postTripFields() {
+      return ['title', 'destination', 'start', 'end'];
+    }
+
+    function postTripNeeds() {
+      return ['title', 'destination'];
+    }
+
+    function postPlaceFields() {
+      return ['name', 'lat', 'lng'];
+    }
+
+    function postPlaceNeeds() {
+      return ['name'];
+    }
+
+    function postTripOk(t) {
+      return shape(t, postTripNeeds(), postTripFields())
+        && str(t.title, 0, 200)
+        && str(t.destination, 0, 200)
+        && optStr(t, 'start', 32)
+        && optStr(t, 'end', 32);
+    }
+
+    function postPlaceOk(p) {
+      return shape(p, postPlaceNeeds(), postPlaceFields()) && str(p.name, 0, 200) && optNum(p, 'lat') && optNum(p, 'lng');
+    }
+
+    // What a post says, the same in the post and in its copies.
+    function postBodyOk(d, id) {
+      return d.id == id
+        && d.kind in ['moment', 'stop', 'day', 'plan', 'meetup']
+        && str(d.text, 0, 2000)
+        && optStr(d, 'photo', 2048)
+        && (!('trip' in d) || postTripOk(d.trip))
+        && (!('place' in d) || postPlaceOk(d.place))
+        && optStr(d, 'link', 500)
+        && optStr(d, 'recap', 200)
+        && uidOk(d.author)
+        && nameOk(d.authorName)
+        && photoOk(d.authorPhoto)
+        && timeOk(d.at);
+    }
+
+    function postOk(d, id) {
+      return shape(d, postNeeds(), postFields())
+        && postBodyOk(d, id)
+        && d.audience is list
+        && d.audience.size() <= 500
+        && d.author in d.audience
+        && d.likes is map;
+    }
+
+    function feedOk(d, id) {
+      return shape(d, feedNeeds(), feedFields()) && postBodyOk(d, id);
+    }
+
+    function commentFields() {
+      return ['id', 'post', 'author', 'name', 'photo', 'text', 'at'];
+    }
+
+    function commentOk(d, postId, commentId) {
+      return shape(d, commentFields(), commentFields())
+        && d.id == commentId
+        && d.post == postId
+        && d.author == request.auth.uid
+        && nameOk(d.name)
+        && photoOk(d.photo)
+        && str(d.text, 1, 1000)
+        && timeOk(d.at);
+    }
+
+    match /posts/{postId} {
+      // The author changes what the post says or who may read it (staying in the audience), never its likes.
+      function authorEdits() {
+        return resource.data.author == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'photo', 'audience', 'recap', 'link'])
+          && postOk(request.resource.data, postId);
+      }
+
+      // Anyone it is for likes it, or takes their like back: their own key of `likes`, and nothing else.
+      function likesOwnKey() {
+        return request.auth.uid in resource.data.audience
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+          && request.resource.data.likes.diff(resource.data.likes).affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.likes.get(request.auth.uid, true) == true;
+      }
+
+      // Anyone signed in may learn a post doesn't exist (any more); only its audience reads it.
+      allow get: if signedIn() && (resource == null || request.auth.uid in resource.data.audience);
+      allow list: if signedIn() && (resource.data.author == request.auth.uid || request.auth.uid in resource.data.audience);
+      allow create: if signedIn()
+        && postOk(request.resource.data, postId)
+        && request.resource.data.author == request.auth.uid
+        && request.resource.data.likes.size() == 0;
+      allow update: if signedIn() && (authorEdits() || likesOwnKey());
+      allow delete: if signedIn() && resource.data.author == request.auth.uid;
+
+      match /comments/{commentId} {
+        function inAudience() {
+          return signedIn() && request.auth.uid in get(/databases/$(database)/documents/posts/$(postId)).data.audience;
+        }
+
+        allow read: if inAudience();
+        allow create: if inAudience() && commentOk(request.resource.data, postId, commentId);
+        allow delete: if signedIn()
+          && (resource.data.author == request.auth.uid
+            || get(/databases/$(database)/documents/posts/$(postId)).data.author == request.auth.uid);
+      }
+    }
+
+    // A reader's feed: copies of posts, written by their authors to themselves and their friends. The owner reads it;
+    // an author reads (and deletes) their own copies in it, so unfriending can find them.
+    match /users/{uid}/feed/{postId} {
+      function mayWrite() {
+        return signedIn()
+          && feedOk(request.resource.data, postId)
+          && request.resource.data.author == request.auth.uid
+          && (isOwner(uid) || isFriend(uid, request.auth.uid));
+      }
+
+      allow read: if signedIn() && (isOwner(uid) || resource.data.author == request.auth.uid);
+      allow create: if mayWrite();
+      allow update: if mayWrite() && resource.data.author == request.auth.uid;
+      allow delete: if signedIn() && (isOwner(uid) || resource == null || resource.data.author == request.auth.uid);
+    }
+
+    // ---------- activity: written by whoever did something for you, read, marked and removed by you ----------
+
+    function inboxFields() {
+      return ['id', 'kind', 'from', 'fromName', 'fromPhoto', 'text', 'link', 'ref', 'at', 'read'];
+    }
+
+    function inboxNeeds() {
+      return ['id', 'kind', 'from', 'fromName', 'fromPhoto', 'text', 'at'];
+    }
+
+    function inboxOk(d, id) {
+      return shape(d, inboxNeeds(), inboxFields())
+        && d.id == id
+        && d.kind in ['friend-request', 'friend-accepted', 'trip-invite', 'joined-trip', 'like', 'comment', 'meetup-going', 'home-safe']
+        && d.from == request.auth.uid
+        && nameOk(d.fromName)
+        && photoOk(d.fromPhoto)
+        && str(d.text, 0, 200)
+        && optStr(d, 'link', 500)
+        && optStr(d, 'ref', 128)
+        && d.get('read', false) == false
+        && timeOk(d.at);
+    }
+
+    // Who may tell `uid` something: anyone asking to be friends, someone going to their meetup, someone in a group
+    // trip with them (about that trip), and their friends.
+    function mayTell(uid, d) {
+      return d.kind == 'friend-request'
+        || (d.kind == 'meetup-going' && d.get('ref', '') != ''
+          && get(/databases/$(database)/documents/meetups/$(d.ref)).data.host == uid)
+        || (d.kind in ['trip-invite', 'joined-trip', 'home-safe'] && d.get('ref', '') != '' && bothIn(d.ref, uid))
+        || isFriend(uid, request.auth.uid);
+    }
+
+    function bothIn(gid, uid) {
+      return request.auth.uid in tripData(gid).roles && uid in tripData(gid).roles;
+    }
+
+    match /users/{uid}/inbox/{id} {
+      allow read, delete: if isOwner(uid);
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow create: if signedIn() && inboxOk(request.resource.data, id) && mayTell(uid, request.resource.data);
+    }
+
+    // ---------- your group trips (pointers, for your other devices): yours alone ----------
+
+    function pointerFields() {
+      return ['gid', 'localId', 'role', 'title', 'at'];
+    }
+
+    function pointerOk(d, gid) {
+      return shape(d, pointerFields(), pointerFields())
+        && d.gid == gid
+        && str(d.localId, 1, 128)
+        && d.role in ['owner', 'editor', 'viewer']
+        && str(d.title, 0, 200)
+        && timeOk(d.at);
+    }
+
+    match /users/{uid}/groups/{gid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && pointerOk(request.resource.data, gid);
+    }
+
+    // ---------- group trips: one shared plan, read by its members ----------
+
+    function groupFields() {
+      return ['id', 'owner', 'roles', 'people', 'title', 'destination', 'start', 'end', 'cover', 'json', 'updatedAt', 'createdAt', 'joinedVia'];
+    }
+
+    function groupNeeds() {
+      return ['id', 'owner', 'roles', 'people', 'title', 'destination', 'start', 'end', 'cover', 'json', 'updatedAt', 'createdAt'];
+    }
+
+    // What lists and invites show of a group trip without reading its plan.
+    function groupMetaOk(d) {
+      return str(d.title, 0, 200) && str(d.destination, 0, 200) && str(d.start, 0, 32) && str(d.end, 0, 32) && sceneOk(d.cover);
+    }
+
+    function messageFields() {
+      return ['id', 'kind', 'text', 'image', 'stopId', 'stopTitle', 'stopWhen', 'place', 'author', 'name', 'photo', 'at'];
+    }
+
+    function messageNeeds() {
+      return ['id', 'kind', 'text', 'author', 'name', 'photo', 'at'];
+    }
+
+    function messageOk(d, id) {
+      return shape(d, messageNeeds(), messageFields())
+        && d.id == id
+        && d.kind in ['text', 'photo', 'stop', 'system', 'status', 'location']
+        && str(d.text, 0, 1000)
+        && optStr(d, 'image', 2048)
+        && optStr(d, 'stopId', 200)
+        && optStr(d, 'stopTitle', 200)
+        && optStr(d, 'stopWhen', 100)
+        && (!('place' in d) || pinOk(d.place))
+        && d.author == request.auth.uid
+        && nameOk(d.name)
+        && photoOk(d.photo)
+        && timeOk(d.at);
+    }
+
+    function voteFields() {
+      return ['stopId', 'uid', 'choiceId', 'at'];
+    }
+
+    function voteOk(d, id) {
+      return shape(d, voteFields(), voteFields())
+        && d.uid == request.auth.uid
+        && str(d.stopId, 1, 200)
+        && str(d.choiceId, 1, 200)
+        && id == d.stopId + '__' + request.auth.uid
+        && timeOk(d.at);
+    }
+
+    function rsvpFields() {
+      return ['stopId', 'uid', 'going', 'at'];
+    }
+
+    function rsvpOk(d, id) {
+      return shape(d, rsvpFields(), rsvpFields())
+        && d.uid == request.auth.uid
+        && str(d.stopId, 1, 200)
+        && d.going in ['in', 'maybe', 'out']
+        && id == d.stopId + '__' + request.auth.uid
+        && timeOk(d.at);
+    }
+
+    function statusFields() {
+      return ['uid', 'kind', 'text', 'stopId', 'place', 'at'];
+    }
+
+    function statusNeeds() {
+      return ['uid', 'kind', 'text', 'at'];
+    }
+
+    function statusOk(d, uid) {
+      return shape(d, statusNeeds(), statusFields())
+        && d.uid == uid
+        && d.kind in ['onway', 'late', 'at', 'free', 'home', 'custom']
+        && str(d.text, 0, 80)
+        && optStr(d, 'stopId', 200)
+        && (!('place' in d) || pinOk(d.place))
+        && timeOk(d.at);
+    }
+
+    match /trips/{gid} {
+      // A new group trip: its maker is its organiser and its only member.
+      function newGroupOk(d) {
+        return shape(d, groupNeeds(), groupFields())
+          && !('joinedVia' in d)
+          && d.id == gid
+          && d.owner == request.auth.uid
+          && d.roles is map
+          && d.roles.size() == 1
+          && d.roles.get(request.auth.uid, '') == 'owner'
+          && d.people is map
+          && d.people.size() == 1
+          && personOk(d.people.get(request.auth.uid, null))
+          && groupMetaOk(d)
+          && str(d.json, 0, 999999)
+          && timeOk(d.updatedAt)
+          && timeOk(d.createdAt);
+      }
+
+      // The organiser or an editor writes the plan: only the plan, its version (going up) and what lists show.
+      function editsPlan(before, after) {
+        return before.roles.get(request.auth.uid, '') in ['owner', 'editor']
+          && after.diff(before).affectedKeys().hasOnly(['json', 'updatedAt', 'title', 'destination', 'start', 'end', 'cover'])
+          && str(after.json, 0, 999999)
+          && after.updatedAt is int
+          && after.updatedAt > before.updatedAt
+          && groupMetaOk(after);
+      }
+
+      // A member changes their own name and photo here.
+      function updatesOwnEntry(before, after) {
+        return request.auth.uid in before.roles
+          && after.diff(before).affectedKeys().hasOnly(['people'])
+          && after.people.diff(before.people).affectedKeys().hasOnly([request.auth.uid])
+          && personOk(after.people.get(request.auth.uid, null));
+      }
+
+      // A member who isn't the organiser leaves: only their own keys go.
+      function leaves(before, after) {
+        return request.auth.uid in before.roles
+          && before.owner != request.auth.uid
+          && after.diff(before).affectedKeys().hasOnly(['roles', 'people'])
+          && after.roles.diff(before.roles).affectedKeys().hasOnly([request.auth.uid])
+          && after.people.diff(before.people).affectedKeys().hasOnly([request.auth.uid])
+          && !(request.auth.uid in after.roles)
+          && !(request.auth.uid in after.people);
+      }
+
+      // The organiser changes other members' roles or removes them (their name and photo go with them); never their
+      // own, never anyone added, and nobody else becomes organiser.
+      function setsRoles(before, after) {
+        return before.owner == request.auth.uid
+          && after.diff(before).affectedKeys().hasOnly(['roles', 'people'])
+          && rolesChangeOk(after.roles.diff(before.roles), after.people.diff(before.people), after.roles);
+      }
+
+      function rolesChangeOk(roles, people, next) {
+        return !roles.affectedKeys().hasAny([request.auth.uid])
+          && roles.addedKeys().size() == 0
+          && next.values().hasOnly(['owner', 'editor', 'viewer'])
+          && next.values().removeAll(['editor', 'viewer']).size() == 1
+          && people.addedKeys().size() == 0
+          && people.changedKeys().size() == 0
+          && people.removedKeys().difference(roles.removedKeys()).size() == 0;
+      }
+
+      // Someone joins with a trip invite that still works: only their own keys of roles and people, the invite's
+      // role, the invite named in joinedVia, and its maker still the organiser or an editor here.
+      function joins(before, after) {
+        return !(request.auth.uid in before.roles)
+          && after.diff(before).affectedKeys().hasOnly(['roles', 'people', 'joinedVia'])
+          && after.roles.diff(before.roles).affectedKeys().hasOnly([request.auth.uid])
+          && after.people.diff(before.people).affectedKeys().hasOnly([request.auth.uid])
+          && personOk(after.people.get(request.auth.uid, null))
+          && tokenOk(after.get('joinedVia', ''))
+          && inviteLetsIn(get(/databases/$(database)/documents/invites/$(after.joinedVia)), after.roles.get(request.auth.uid, ''), before.roles);
+      }
+
+      function inviteLetsIn(inv, role, roles) {
+        return inv != null
+          && inv.data.kind == 'trip'
+          && inv.data.get('trip', '') == gid
+          && inv.data.get('revoked', false) == false
+          && role in ['editor', 'viewer']
+          && inv.data.get('role', '') == role
+          && roles.get(inv.data.from, '') in ['owner', 'editor'];
+      }
+
+      // Anyone signed in may learn a group trip doesn't exist (any more); only its members read it.
+      allow get: if signedIn() && (resource == null || request.auth.uid in resource.data.roles);
+      allow create: if signedIn() && newGroupOk(request.resource.data);
+      allow update: if signedIn()
+        && (editsPlan(resource.data, request.resource.data)
+          || updatesOwnEntry(resource.data, request.resource.data)
+          || leaves(resource.data, request.resource.data)
+          || setsRoles(resource.data, request.resource.data)
+          || joins(resource.data, request.resource.data));
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+
+      // What members say and decide. The organiser may delete all of it (when they stop sharing the trip).
+      match /messages/{id} {
+        allow read: if isMember(gid);
+        allow create: if isMember(gid) && messageOk(request.resource.data, id);
+        allow delete: if signedIn()
+          && ((resource.data.author == request.auth.uid && isMember(gid)) || isOrganiser(gid));
+      }
+
+      // Your vote on an option stop, and whether you're in for a stop: one each, "{stopId}__{uid}".
+      match /votes/{vid} {
+        allow read: if isMember(gid);
+        allow create, update: if isMember(gid) && voteOk(request.resource.data, vid);
+        allow delete: if signedIn()
+          && (isOrganiser(gid) || (isMember(gid) && (resource == null || resource.data.uid == request.auth.uid)));
+      }
+
+      match /rsvps/{rid} {
+        allow read: if isMember(gid);
+        allow create, update: if isMember(gid) && rsvpOk(request.resource.data, rid);
+        allow delete: if signedIn()
+          && (isOrganiser(gid) || (isMember(gid) && (resource == null || resource.data.uid == request.auth.uid)));
+      }
+
+      match /status/{uid} {
+        allow read: if isMember(gid);
+        allow create, update: if isOwner(uid) && isMember(gid) && statusOk(request.resource.data, uid);
+        allow delete: if (isOwner(uid) && isMember(gid)) || isOrganiser(gid);
+      }
+    }
+
+    // ---------- meetups: anyone with the link reads one; its host writes it ----------
+
+    function meetupFields() {
+      return ['id', 'host', 'hostName', 'hostPhoto', 'title', 'note', 'place', 'start', 'timezone', 'destination', 'tripTitle', 'createdAt', 'updatedAt', 'cancelled'];
+    }
+
+    function meetupNeeds() {
+      return ['id', 'host', 'hostName', 'hostPhoto', 'title', 'note', 'place', 'start', 'timezone', 'createdAt', 'updatedAt'];
+    }
+
+    function meetupPlaceFields() {
+      return ['name', 'lat', 'lng', 'query'];
+    }
+
+    function meetupPlaceNeeds() {
+      return ['name'];
+    }
+
+    function meetupPlaceOk(p) {
+      return p == null
+        || (shape(p, meetupPlaceNeeds(), meetupPlaceFields()) && str(p.name, 0, 200) && optNum(p, 'lat') && optNum(p, 'lng') && optStr(p, 'query', 300));
+    }
+
+    function meetupOk(d, id) {
+      return shape(d, meetupNeeds(), meetupFields())
+        && d.id == id
+        && uidOk(d.host)
+        && nameOk(d.hostName)
+        && photoOk(d.hostPhoto)
+        && str(d.title, 1, 80)
+        && d.title.trim().size() > 0
+        && str(d.note, 0, 280)
+        && meetupPlaceOk(d.place)
+        && str(d.start, 1, 64)
+        && str(d.timezone, 1, 64)
+        && optStr(d, 'destination', 200)
+        && optStr(d, 'tripTitle', 200)
+        && (!('cancelled' in d) || d.cancelled is bool)
+        && timeOk(d.createdAt)
+        && timeOk(d.updatedAt);
+    }
+
+    function goingFields() {
+      return ['uid', 'name', 'photo', 'at'];
+    }
+
+    function goingOk(d, uid) {
+      return shape(d, goingFields(), goingFields()) && d.uid == uid && nameOk(d.name) && photoOk(d.photo) && timeOk(d.at);
+    }
+
+    match /meetups/{id} {
+      allow get: if true;
+      allow list: if signedIn() && resource.data.host == request.auth.uid;
+      allow create: if signedIn()
+        && tokenOk(id)
+        && meetupOk(request.resource.data, id)
+        && request.resource.data.host == request.auth.uid
+        && !('cancelled' in request.resource.data);
+      allow update: if signedIn()
+        && resource.data.host == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'note', 'place', 'start', 'timezone', 'destination', 'tripTitle', 'cancelled', 'updatedAt'])
+        && meetupOk(request.resource.data, id);
+      allow delete: if signedIn() && resource.data.host == request.auth.uid;
+
+      // Who's going: signed-in people see it; you say only that you are going.
+      match /going/{uid} {
+        allow read: if signedIn();
+        allow create, update: if isOwner(uid)
+          && goingOk(request.resource.data, uid)
+          && exists(/databases/$(database)/documents/meetups/$(id));
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ---------- plan links: anyone with the link reads one; its owner removes it ----------
+
+    function shareFields() {
+      return ['id', 'owner', 'ownerName', 'ownerPhoto', 'title', 'destination', 'start', 'end', 'cover', 'days', 'json', 'createdAt', 'revoked'];
+    }
+
+    function shareNeeds() {
+      return ['id', 'owner', 'ownerName', 'ownerPhoto', 'title', 'destination', 'start', 'end', 'cover', 'days', 'json', 'createdAt'];
+    }
+
+    function shareOk(d, id) {
+      return shape(d, shareNeeds(), shareFields())
+        && d.id == id
+        && uidOk(d.owner)
+        && nameOk(d.ownerName)
+        && photoOk(d.ownerPhoto)
+        && groupMetaOk(d)
+        && d.days is int
+        && d.days >= 0
+        && d.days <= 366
+        && str(d.json, 0, 999999)
+        && timeOk(d.createdAt);
+    }
+
+    match /shares/{id} {
+      allow get: if true;
+      allow list: if signedIn() && resource.data.owner == request.auth.uid;
+      allow create: if signedIn()
+        && tokenOk(id)
+        && shareOk(request.resource.data, id)
+        && request.resource.data.owner == request.auth.uid
+        && !('revoked' in request.resource.data);
+      allow update: if signedIn()
+        && resource.data.owner == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['revoked', 'json'])
+        && request.resource.data.revoked == true
+        && request.resource.data.json == '';
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
     }
   }
 }

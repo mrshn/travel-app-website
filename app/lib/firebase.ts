@@ -52,6 +52,9 @@ export function createFirebase(config: FirebaseConfig, emulators = '') {
 
   return {
     auth,
+    /** The database and the photo bucket themselves, for the social layer's backend (lib/social/firestore.ts). */
+    db,
+    storage,
     onUser: (fn: (u: User | null) => void) => onAuthStateChanged(auth, fn),
     redirectResult: () => getRedirectResult(auth),
     signInRedirect: (hint?: string) => signInWithRedirect(auth, google(hint)),
