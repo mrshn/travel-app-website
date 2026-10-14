@@ -6820,6 +6820,153 @@ export const romeTrip: Trip = {
    "dayId": "sun"
   }
  ],
+ "meet": [
+  {
+   "id": "hostel-events",
+   "kind": "event",
+   "icon": "bed",
+   "title": "Your hostel's events",
+   "text": "Social hostels often run a party, a pub crawl, free walks or live music most nights. Sit at the bar and say hi: it's the easiest start.",
+   "when": "Most nights",
+   "ask": "Anyone up for the hostel bar tonight?"
+  },
+  {
+   "id": "walk-rome-central",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Free walking tour: Rome Central",
+   "text": "**Best Euro Tours** meets at Piazza di S. Marco 48, by Piazza Venezia: look for the green “CITY WALKING TOUR” sign. Free, tip €10–20; rated 4.99/5 from 6,793 reviews.",
+   "when": "Daily at 10:00 and 11:00, and more",
+   "link": {
+    "label": "GuruWalk calendar",
+    "url": "https://www.guruwalk.com/rome"
+   },
+   "ask": "Anyone for the free walking tour from Piazza Venezia at 10:00?"
+  },
+  {
+   "id": "walk-what-about-tours",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Free walking tour: What About Tours",
+   "text": "The city centre tour meets on the church steps near Trajan's Column, Foro Traiano 89. Their Colosseum, Ghetto and Trastevere tours meet where you book. Free: tip what it was worth.",
+   "when": "City centre at 11:00 and 17:00",
+   "link": {
+    "label": "Freetour.com",
+    "url": "https://www.freetour.com/rome"
+   },
+   "ask": "Anyone for the 17:00 free walking tour from Trajan's Column?"
+  },
+  {
+   "id": "crawl-ultimate-party",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Rome's Ultimate Party pub crawl",
+   "text": "Meets at **The Highlander Pub**, Vicolo di S. Biagio 9, near the Spanish Steps. About US$40 with one drink, or US$56 with an hour of open bar; pizza, shots and club entry included; 18+. Book online.",
+   "when": "Fri 9 Oct, 21:30 (it runs nightly)",
+   "dayId": "fri",
+   "link": {
+    "label": "Viator",
+    "url": "https://www.viator.com/tours/Rome/Romes-Ultimate-Party-aka-the-Spanish-Steps-Pub-Crawl/d511-348679P2"
+   },
+   "ask": "Anyone for the pub crawl tonight? We meet at The Highlander Pub at 21:30."
+  },
+  {
+   "id": "crawl-italian",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Italian Pub Crawls",
+   "text": "A calmer crawl: three bars from the Giordano Bruno statue in Campo de' Fiori. Drinks aren't included, and the club is €10 more.",
+   "when": "Evenings: nights aren't published, so check the site",
+   "link": {
+    "label": "Website",
+    "url": "https://italianpubcrawls.com/rome-pub-crawl/"
+   },
+   "ask": "Anyone for the pub crawl from Campo de' Fiori tonight?"
+  },
+  {
+   "id": "food-twilight-trastevere",
+   "kind": "tour",
+   "icon": "food",
+   "title": "Twilight Trastevere food tour",
+   "text": "**Eating Europe**'s evening tour, about 4 hours with at most 12 people: dinner plus a ready-made group for the bars afterwards. €94; free cancellation up to 24 h before.",
+   "when": "Sat 10 Oct, evening",
+   "dayId": "sat",
+   "link": {
+    "label": "Eating Europe",
+    "url": "https://www.eatingeurope.com/rome/"
+   },
+   "ask": "Anyone on the Twilight Trastevere food tour on Saturday? Bars after?"
+  },
+  {
+   "id": "app-tablo",
+   "kind": "app",
+   "icon": "food",
+   "title": "Tablo",
+   "text": "An Italian app for joining strangers at a restaurant table: for making friends rather than dating.",
+   "when": "Any lunch or dinner",
+   "ask": "Anyone fancy sharing a table for dinner tonight?"
+  },
+  {
+   "id": "language-exchange",
+   "kind": "event",
+   "icon": "chat",
+   "title": "Language exchanges",
+   "text": "Most fall Monday to Wednesday. **Pignetismi** in Pigneto listed a Thursday speaking club and a Sunday social breakfast earlier in the year: check Eventbrite a week before.",
+   "when": "Mostly Mon to Wed: check the week before",
+   "ask": "Anyone going to a language exchange this week?"
+  },
+  {
+   "id": "app-hostelworld",
+   "kind": "app",
+   "icon": "chat",
+   "title": "Hostelworld City Chat and Linkups",
+   "text": "Rome's City Chat opens 14 days before you arrive. Post a plan in Linkups and see who joins.",
+   "when": "From 14 days before you arrive",
+   "link": {
+    "label": "Linkups",
+    "url": "https://www.hostelworld.com/linkups"
+   },
+   "ask": "Anyone for the Vatican at 8 on Friday?"
+  },
+  {
+   "id": "bar-san-calisto",
+   "kind": "place",
+   "icon": "glass",
+   "title": "Aperitivo at Bar San Calisto",
+   "text": "Trastevere's busy, cheap bar: €3 Peroni and €5 spritz, open to 02:00. Go for aperitivo any evening, or start Saturday's Trastevere night here, then the Piazza Trilussa fountain steps.",
+   "when": "Sat 10 Oct from 23:00 (aperitivo from 19:00 any night)",
+   "dayId": "sat",
+   "ask": "Anyone for a drink at Bar San Calisto in Trastevere at 23:00 on Saturday?"
+  },
+  {
+   "id": "sun-beer-pong",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Sunday beer pong at Alessandro Palace",
+   "text": "This hostel bar at Via Vicenza 42 runs beer pong and happy hour on Sundays, when the clubs are quiet.",
+   "when": "Sun 11 Oct, 20:00 to 23:00",
+   "dayId": "sun",
+   "link": {
+    "label": "Website",
+    "url": "https://alessandropalace.com/en/home-alessandro-palace/"
+   },
+   "ask": "Anyone for beer pong at Alessandro Palace at 20:00 on Sunday?"
+  },
+  {
+   "id": "sun-ghost-walk",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Ghost walk with What About Tours",
+   "text": "A free evening tour: tip what it was worth. Check that it runs on Sunday.",
+   "when": "Sun 11 Oct, 20:00",
+   "dayId": "sun",
+   "link": {
+    "label": "Freetour.com",
+    "url": "https://www.freetour.com/rome"
+   },
+   "ask": "Anyone for the ghost walk at 20:00 on Sunday?"
+  }
+ ],
  "createdAt": "2026-09-29T00:00:00.000Z",
  "updatedAt": "2026-09-29T00:00:00.000Z"
 }
