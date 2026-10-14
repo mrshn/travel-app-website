@@ -36,6 +36,12 @@ const SEALS = [
   { ...badge('golden-hour'), earned: true },
   { ...badge('night-owl'), earned: false, value: 0, goal: 1 },
 ]
+/** The made-up group of the Together sample (initials only: no pictures, nothing asked from the network). */
+const GROUP = [
+  { uid: 'sample-you', name: 'You', photo: null },
+  { uid: 'sample-ali', name: 'Ali', photo: null },
+  { uid: 'sample-can', name: 'Can', photo: null },
+]
 
 useHead({ title: 'Travels: your trip, live' })
 </script>
@@ -221,6 +227,41 @@ useHead({ title: 'Travels: your trip, live' })
                 <span>{{ b.label }}</span>
               </li>
             </ul>
+          </div>
+        </article>
+
+        <article class="card fcard wide" aria-labelledby="landing-together">
+          <div class="ftext">
+            <h3 id="landing-together" class="fname">
+              <AppIcon name="users" size="sm" />Together
+            </h3>
+            <p class="ftitle">
+              Plan a trip with friends
+            </p>
+            <p class="fbody">
+              Invite friends into one plan: vote on the options, chat, and see who's in for each stop. Share moments with your friends, and post an open invite when you want to meet people.
+            </p>
+          </div>
+          <div class="demo demo-together" role="img" aria-label="Example: you, Ali and Can plan Rome together. Pick your Friday night: pub crawl, 3 votes and the group's pick; hostel party, 1 vote. Ali asks: Anyone for the Vatican at 8 on Friday?">
+            <div class="dg-top">
+              <span class="dg-faces"><Avatar v-for="p in GROUP" :key="p.uid" :person="p" :size="32" ring /></span>
+              <span class="dg-trip"><b>Rome</b><span>3 people</span></span>
+            </div>
+            <div class="dg-vote">
+              <span class="dg-q">Pick your Friday night</span>
+              <span class="dg-opt lead">
+                <span class="dg-name">Pub crawl<span class="chip t-gold">Group pick</span></span><b class="num">3</b>
+                <span class="bar thin"><i class="fill" style="width: 75%" /></span>
+              </span>
+              <span class="dg-opt">
+                <span class="dg-name">Hostel party</span><b class="num">1</b>
+                <span class="bar thin"><i class="fill" style="width: 25%" /></span>
+              </span>
+            </div>
+            <p class="dg-msg">
+              <Avatar :person="GROUP[1]" :size="28" />
+              <span class="dg-bubble"><b>Ali</b><span>Anyone for the Vatican at 8 on Friday?</span></span>
+            </p>
           </div>
         </article>
 
@@ -479,6 +520,24 @@ useHead({ title: 'Travels: your trip, live' })
 .db-gloss { font-size: 14px; }
 .db-seals { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .db-seals li { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 12.5px; font-weight: 650; line-height: 1.2; }
+
+/* Together */
+.demo-together { display: flex; flex-direction: column; gap: 12px; }
+.dg-top { display: flex; align-items: center; gap: 10px; }
+.dg-faces { display: inline-flex; }
+.dg-faces > :deep(.av) + :deep(.av) { margin-left: -8px; }
+.dg-trip { display: flex; flex-direction: column; line-height: 1.2; }
+.dg-trip b { font-size: 15px; }
+.dg-trip span { font-size: 13px; color: var(--fg-2); font-weight: 600; }
+.dg-vote { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.dg-q { font-size: 13.5px; font-weight: 650; color: var(--fg-2); }
+.dg-opt { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; font-size: 14px; font-weight: 650; }
+.dg-opt .bar { grid-column: 1 / -1; background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.dg-opt .num { font-size: 13px; color: var(--fg-2); }
+.dg-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.dg-msg { display: flex; align-items: flex-end; gap: 8px; }
+.dg-bubble { display: flex; flex-direction: column; gap: 1px; padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; line-height: 1.35; }
+.dg-bubble b { font-size: 12.5px; color: var(--fg-2); }
 
 /* ---------- how it works ---------- */
 .how { padding-top: 40px; }

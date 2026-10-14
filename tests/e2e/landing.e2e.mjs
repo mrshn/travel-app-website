@@ -451,7 +451,8 @@ try {
     })
     await ctxClose(d)
   }
-  // The home's header holds four buttons for every signed-in device: each keeps 44 x 44, and the logo stays whole.
+  // The home's header holds five buttons for every signed-in device (Notes, Theme, Friends, Account, Settings): each keeps
+  // 44 x 44, and the logo stays whole.
   for (const width of [390, 360, 320]) {
     const d = await device({ width })
     await check(`the home's header at ${width} px: the Travels link and each button at least 44 x 44, the logo whole, nothing cut`, async () => {
@@ -468,7 +469,7 @@ try {
           cut: top.scrollWidth - top.clientWidth,
         }
       })
-      assert(m.controls.length === 5, `controls: ${JSON.stringify(m.controls)}`)
+      assert(m.controls.length === 6, `controls: ${JSON.stringify(m.controls)}`)
       const small = m.controls.filter(([, w, h]) => w < 44 || h < 44)
       assert(!small.length, `under 44 px: ${JSON.stringify(small)}`)
       assert(m.logo[0] >= 29.5 && m.logo[1] >= 29.5, `the logo is ${m.logo.join(' x ')}`)
