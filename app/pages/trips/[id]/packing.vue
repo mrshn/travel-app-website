@@ -40,21 +40,16 @@ function add() {
   const t = item.value.trim()
   const tr = trip.value
   if (!t || !tr) return
-  if (tr.packing.includes(t)) {
+  if (!v.trips.addPacking(tr.id, t)) {
     toast('Already on the list')
     return
   }
-  v.trips.update(tr.id, (x) => {
-    x.packing.push(t)
-  })
   item.value = ''
 }
 function remove(x: string) {
   const tr = trip.value
   if (!tr) return
-  v.trips.update(tr.id, (t) => {
-    t.packing = t.packing.filter(p => p !== x)
-  })
+  v.trips.removePacking(tr.id, x)
   v.togglePacking(x, false)
 }
 function unpackAll() {

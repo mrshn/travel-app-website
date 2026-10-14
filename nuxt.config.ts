@@ -9,6 +9,8 @@ export default defineNuxtConfig({
     public: {
       // Set NUXT_PUBLIC_FIREBASE_EMULATORS=127.0.0.1 when building to use local Firebase emulators (tests).
       firebaseEmulators: '',
+      // Set NUXT_PUBLIC_SOCIAL_BACKEND=memory for browser checks of the social layer without a cloud (never in production).
+      socialBackend: '',
     },
   },
   modules: ['@vueuse/nuxt', '@vite-pwa/nuxt'],

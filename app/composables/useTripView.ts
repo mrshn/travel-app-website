@@ -3,6 +3,7 @@ import type { Trip } from '#shared/types/trip'
 import { costSummary, type CostSummary } from '#shared/utils/costs'
 import { placesInPlan, placeSetProgress, placeStamps, type PlacePlanHit, type PlaceSetProgress, type PlaceStampInfo } from '#shared/utils/places'
 import { activeVariant, planDays, summarize, type DayPlan, type ResolvedStop, type StopState } from '#shared/utils/plan'
+import { socialCanEdit } from '#shared/utils/social'
 import { tripMoment } from '#shared/utils/time'
 
 /** Today's money on the trip's clock (it follows a preview). */
@@ -74,6 +75,11 @@ function createTripView(idSource: MaybeRefOrGetter<string>) {
     return old && sameJson(old, next) ? old : next
   })
 
+  /** A group trip (planned with others): its id in the cloud and your role in it. */
+  const group = computed(() => trip.value?.group ?? null)
+  /** You can change the plan: your own trip, or a group trip where you're the organiser or can edit. */
+  const canEdit = computed(() => !!trip.value && (!trip.value.group || socialCanEdit(trip.value.group.role)))
+
   function locate(stopId: string): { plan: DayPlan, stop: ResolvedStop, state: StopState } | null {
     for (const plan of plans.value) {
       const stop = plan.stops.find(s => s.id === stopId)
@@ -82,7 +88,7 @@ function createTripView(idSource: MaybeRefOrGetter<string>) {
     return null
   }
 
-  return { id, trip, moment, variant, plans, summary, today, costs, stamps, inPlan, sets, todayCosts, locate, trips, clock, ...prog }
+  return { id, trip, moment, variant, plans, summary, today, costs, stamps, inPlan, sets, todayCosts, group, canEdit, locate, trips, clock, ...prog }
 }
 
 export type TripView = ReturnType<typeof createTripView>

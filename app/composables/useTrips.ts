@@ -3,6 +3,7 @@ import type { Day, Scene, Stop, Trip } from '#shared/types/trip'
 import { datesBetween } from '#shared/utils/time'
 import { editableStops, slugify } from '#shared/utils/plan'
 import { copyOfSeed, mergeSeed, planFingerprint } from '#shared/utils/seed'
+import { stopListKey, stopTombstone } from '#shared/utils/tripmerge'
 import { SEED_TRIPS } from '~/data/trips'
 
 export { SEED_TRIPS }
@@ -118,9 +119,10 @@ export function useTrips() {
     return trip
   }
 
+  /** Changes a trip's plan. A group trip you can only view is never changed here (the cloud would refuse it too). */
   function update(id: string, fn: (t: Trip) => void) {
     const t = get(id)
-    if (!t) return
+    if (!t || t.group?.role === 'viewer') return
     fn(t)
     touch(t)
   }
@@ -213,14 +215,21 @@ export function useTrips() {
     catch { /* storage refused */ }
   }
 
+  /** Notes when a stop, booking or packing item was deleted, so a shared plan's merge can't bring it back (tripmerge). */
+  function bury(t: Trip, key: string, at: string) {
+    t.tombstones = { ...t.tombstones, [key]: at }
+  }
+
+  /** Adds or replaces a stop in a day's list (the version of the plan given), stamped with the time of the change. */
   function upsertStop(tripId: string, dayId: string, variant: string | undefined, stop: Stop) {
     update(tripId, (t) => {
       const day = t.days.find(d => d.id === dayId)
       if (!day) return
       const list = editableStops(day, variant)
+      const next = { ...stop, updatedAt: new Date().toISOString() }
       const i = list.findIndex(s => s.id === stop.id)
-      if (i >= 0) list[i] = stop
-      else list.push(stop)
+      if (i >= 0) list[i] = next
+      else list.push(next)
     })
   }
 
@@ -230,10 +239,14 @@ export function useTrips() {
       const a = t.days.find(d => d.id === fromDay)
       const b = t.days.find(d => d.id === toDay)
       if (!a || !b) return
+      const now = new Date().toISOString()
       const from = editableStops(a, variant)
       const i = from.findIndex(s => s.id === stop.id)
-      if (i >= 0) from.splice(i, 1)
-      editableStops(b, variant).push(stop)
+      if (i >= 0) {
+        from.splice(i, 1)
+        bury(t, stopTombstone(a.id, stopListKey(a, variant), stop.id), now)
+      }
+      editableStops(b, variant).push({ ...stop, updatedAt: now })
     })
   }
 
@@ -243,7 +256,74 @@ export function useTrips() {
       if (!day) return
       const list = editableStops(day, variant)
       const i = list.findIndex(s => s.id === stopId)
-      if (i >= 0) list.splice(i, 1)
+      if (i >= 0) {
+        list.splice(i, 1)
+        bury(t, stopTombstone(day.id, stopListKey(day, variant), stopId), new Date().toISOString())
+      }
+    })
+  }
+
+  /**
+   * Changes a stop wherever the plan has it (a stop can sit in more than one version of the plan, as the Colosseum
+   * does), each copy stamped. Used for the group pick of an option (its `default`).
+   */
+  function updateStop(tripId: string, stopId: string, fn: (s: Stop) => void) {
+    update(tripId, (t) => {
+      const now = new Date().toISOString()
+      for (const d of t.days) {
+        for (const list of [d.stops, ...Object.values(d.variants ?? {}).map(v => v.stops)]) {
+          for (const s of list) {
+            if (s.id !== stopId) continue
+            fn(s)
+            s.updatedAt = now
+          }
+        }
+      }
+    })
+  }
+
+  /**
+   * Edits one day's list of stops (the version of the plan given) in one go: shift times, drop stops. Stops whose
+   * content changed are stamped; stops that left the list get a tombstone (Plans changed).
+   */
+  function editDayStops(tripId: string, dayId: string, variant: string | undefined, mutate: (list: Stop[]) => void) {
+    update(tripId, (t) => {
+      const day = t.days.find(d => d.id === dayId)
+      if (!day) return
+      const list = editableStops(day, variant)
+      const before = new Map(list.map(s => [s.id, JSON.stringify(s)] as const))
+      mutate(list)
+      const now = new Date().toISOString()
+      const after = new Set<string>()
+      for (const s of list) {
+        after.add(s.id)
+        if (before.get(s.id) !== JSON.stringify(s)) s.updatedAt = now
+      }
+      for (const id of before.keys()) {
+        if (!after.has(id)) bury(t, stopTombstone(day.id, stopListKey(day, variant), id), now)
+      }
+    })
+  }
+
+  /** Adds an item to the packing list (false when it's already there). */
+  function addPacking(tripId: string, item: string): boolean {
+    const t = get(tripId)
+    const x = item.trim()
+    if (!t || !x || t.packing.includes(x)) return false
+    update(tripId, (tr) => {
+      tr.packing.push(x)
+      if (tr.tombstones?.[`packing:${x}`]) {
+        const { [`packing:${x}`]: _gone, ...rest } = tr.tombstones
+        tr.tombstones = rest
+      }
+    })
+    return true
+  }
+
+  function removePacking(tripId: string, item: string) {
+    update(tripId, (t) => {
+      t.packing = t.packing.filter(p => p !== item)
+      bury(t, `packing:${item}`, new Date().toISOString())
     })
   }
 
@@ -251,5 +331,8 @@ export function useTrips() {
     trips.value = next
   }
 
-  return { trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, addSample, updateFor, applyUpdate, skipUpdate, upsertStop, moveStop, removeStop, replaceAll, clearAll }
+  return {
+    trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, addSample, updateFor, applyUpdate, skipUpdate,
+    upsertStop, moveStop, removeStop, updateStop, editDayStops, addPacking, removePacking, replaceAll, clearAll,
+  }
 }

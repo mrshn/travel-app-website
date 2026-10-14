@@ -575,3 +575,49 @@ describe('phones syncing through the rollout (randomised, as useCloud.reconcile(
     })
   }
 })
+
+describe('claims and people you met', () => {
+  const claim = (id: string, updatedAt: string, extra: Partial<import('../shared/types/trip').Claim> = {}) => ({
+    id, kind: 'flight-cancelled' as const, title: 'Cancelled flight', status: 'draft' as const, lines: [], steps: [], at: '2026-10-09T08:00:00Z', updatedAt, ...extra,
+  })
+  const person = (id: string, updatedAt: string, extra: Partial<import('../shared/types/trip').MetPerson> = {}) => ({
+    id, name: 'Ana', at: '2026-10-10T20:00:00Z', updatedAt, ...extra,
+  })
+
+  it('merges them record by record, a deletion staying deleted', () => {
+    const a = P((p) => {
+      p.claims = { c1: claim('c1', '2026-10-09T10:00:00Z', { status: 'sent' }), c2: claim('c2', '2026-10-09T10:00:00Z') }
+      p.people = { m1: person('m1', '2026-10-10T21:00:00Z', { handle: '@ana' }) }
+    })
+    const b = P((p) => {
+      p.claims = { c1: claim('c1', '2026-10-09T09:00:00Z'), c2: claim('c2', '2026-10-09T11:00:00Z', { deleted: true }) }
+      p.people = { m2: person('m2', '2026-10-10T22:00:00Z', { name: 'Luca' }) }
+    })
+    for (const m of [mergeProgress(a, b), mergeProgress(b, a)]) {
+      expect(m.claims?.c1?.status).toBe('sent')
+      expect(m.claims?.c2?.deleted).toBe(true)
+      expect(Object.keys(m.people ?? {})).toEqual(['m1', 'm2'])
+    }
+    expect(mergeProgress(P(() => {}), P(() => {}))).not.toHaveProperty('claims')
+  })
+
+  it('counts them as something of yours', () => {
+    expect(isPristine('progress', JSON.stringify(P(p => (p.claims = { c1: claim('c1', 'x') }))))).toBe(false)
+    expect(isPristine('progress', JSON.stringify(P(p => (p.people = { m1: person('m1', 'x') }))))).toBe(false)
+  })
+
+  it('never loses them to a newer copy that lacks them', () => {
+    const local = JSON.stringify(P((p) => {
+      p.claims = { c1: claim('c1', '2026-10-09T10:00:00Z') }
+    }))
+    const remote = JSON.stringify(P(p => (p.stops.x = { status: 'done', at: '2026-10-10T10:00:00Z' })))
+    const d = decide('progress', local, cloud(remote, 200), { hash: jsonHash(local), updatedAt: 100 })
+    expect(d.do).toBe('merge')
+    const merged = JSON.parse((d as { json: string }).json) as TripProgress
+    expect(merged.claims?.c1?.title).toBe('Cancelled flight')
+    expect(merged.stops.x?.status).toBe('done')
+    // Nothing of them on either side: the newer copy is taken as it is.
+    const plain = JSON.stringify(P(() => {}))
+    expect(decide('progress', plain, cloud(remote, 200), { hash: jsonHash(plain), updatedAt: 100 }).do).toBe('apply')
+  })
+})
