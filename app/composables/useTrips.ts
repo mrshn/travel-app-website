@@ -119,6 +119,14 @@ export function useTrips() {
     return trip
   }
 
+  /** Adds a whole trip (a copy of a shared plan): under a new id when this one is taken. Returns it as stored. */
+  function addTrip(t: Trip): Trip {
+    let id = t.id
+    while (get(id)) id = `${t.id}-${Math.random().toString(36).slice(2, 5)}`
+    trips.value.push({ ...t, id })
+    return get(id)!
+  }
+
   /** Changes a trip's plan. A group trip you can only view is never changed here (the cloud would refuse it too). */
   function update(id: string, fn: (t: Trip) => void) {
     const t = get(id)
@@ -332,7 +340,7 @@ export function useTrips() {
   }
 
   return {
-    trips, sorted, get, create, update, setDates, remove, seedOf, resetToSeed, addSample, updateFor, applyUpdate, skipUpdate,
+    trips, sorted, get, create, addTrip, update, setDates, remove, seedOf, resetToSeed, addSample, updateFor, applyUpdate, skipUpdate,
     upsertStop, moveStop, removeStop, updateStop, editDayStops, addPacking, removePacking, replaceAll, clearAll,
   }
 }
