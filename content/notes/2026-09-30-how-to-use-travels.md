@@ -2,7 +2,7 @@
 title: How to use the Travels app
 date: 2026-09-30
 kind: tips
-summary: Getting the most out of the app on a trip, and how chats with Claude end up here.
+summary: Getting the most out of the app on a trip, with friends, and when plans change; and how chats with Claude end up here.
 tags: [app, how-to]
 ---
 
@@ -34,6 +34,28 @@ tags: [app, how-to]
 - Stamp every place in a set and its header turns gold and reads **Complete**.
 - Your stamps give you a **rank**, from Peregrinus to Imperator, and 12 **badges** reward things like an early start, a sunset, rating ten stops or logging costs on three days. A gold toast celebrates each new one once; they're all under **More → All badges** (or the **Top picks** chip on Places).
 
+## Together: group trips
+
+- Open a trip and tap the faces (or the person-plus icon) in its header: that's **Together**. **Invite people** gives a link and a QR code: **Can edit** lets them change the plan with you, **Can view** lets them follow along. The first invite makes the trip a group trip.
+- Everyone sees one plan. If two of you change it at the same time, both changes are kept (stop by stop). Your ticks, ratings, notes, photos, costs and stamps stay yours.
+- **Chat**: say something, send a photo, a stop ("let's meet here") or where you are (one pin, never tracking).
+- **People**: everyone's status. Tap a quick one: On my way, Running late, At the stop you're at, Free now, Home safe. The organiser can change roles or remove someone; anyone can leave (keeping a copy of the trip).
+- **Decide**: picking an option ("Pick your Friday night") is also your vote; the group sees the votes, and an editor makes the leader the group's pick. Who's in for the next stops shows here and in each stop's sheet (**I'm in**, **Maybe**, **Not me**).
+- On Now, a line shows where everyone is; late at night, the Getting back card has **I'm home safe**.
+
+## Friends, posts and meeting people
+
+- **Friends** (the people icon on the home screen): your **friend link** and QR code (show it to someone you just met), **Find by @handle**, and requests. Choose a handle and a line about you under **You**.
+- **Share a moment** from a stop or from your day (Plan, *Your day*): text and one photo, for your friends only. Like and comment; the bell shows likes, comments, requests and invites.
+- **Let friends see where I'm going** (under **You**, off until you turn it on): friends see your trips' places and dates, and you see who's travelling now, soon, or in the same city as you.
+- **Meet people** (More, or a stop's **Ask people to join**): tonight's options, ways to meet people in the city, friends in town, and **meetups**: a link with a time and a place ("Anyone for the Vatican at 8 on Friday?") you can paste in the hostel's chat or WhatsApp. Anyone can open it; saying **I'm in** needs an account. Keep the **people you met** there too, and send them your friend link.
+- **Share this plan** (More): invite people to plan it with you or to follow along, or make a **plan link**: a copy anyone can open and copy to their own trips (where you stay is left out unless you tick it). Remove a link any time under **Friends → You**.
+
+## When plans change
+
+- **Plans changed?** (on Now, on each day in Plan, and in More): **Running late** moves the rest of today (booked stops stay put); **Starting later** skips what's gone and moves the must-dos to a day they're open (a Vatican morning lost to a late flight goes to Saturday); **Flight cancelled or delayed** lists what to ask for at the desk and what not to accept in a hurry, a message for where you stay, and **Start a claim**; **Taking the rest of today off** skips what's left. Each has Undo; in a group trip the chat says what changed.
+- **Claims** (More): money back for a cancelled or delayed flight, a lost bag or a booking: what you claim and how likely each part is, the costs it covers (link them from the Costs page), steps with dates, and the deadline, which also shows on the home screen as it gets close. It's a guide, not legal advice.
+
 ## Late at night
 
 - From 21:00 until 05:00, every night of the trip but the last, once your day is done or while you're out, Now shows a **Getting back** card: **Take me home** opens directions to where you're staying, **Show the driver** puts its address up full screen in Italian for a taxi driver, and **Call a taxi** dials the taxi number from SOS.
@@ -53,7 +75,8 @@ tags: [app, how-to]
 - Signing in with another Google account on the same phone clears the phone's copy first; everything that reached the first account stays there. If some changes haven't reached the first account yet, the app asks before removing them: **Cancel** keeps them, so you can sign in with the first account and save them.
 - If the app says **Sign in again to keep saving to your account**, tap **Sign in with Google** under it. Until then, your changes wait on the phone.
 - **Settings → Export everything** still makes a backup file of your own. **Import a backup** merges the file's ticks, costs and stamps with the phone's instead of replacing them.
-- These notes and the sample trip come from the GitHub repository. A trip's own notes (its research, its planning chat) show for the accounts that have that trip, for example after **Try the sample trip**.
+- These notes and the sample trip come from the GitHub repository. A trip's own notes show for the accounts that have that trip. The repository is public, so personal research and chat logs are kept elsewhere (the Rome ones moved to the owner's private Claude project after the trip).
+- Friends and group trips share only what they say: your profile with signed-in people, your trips' places and dates with friends (once you turn it on), posts with friends, a group trip with its members. Your ticks, notes, photos, costs, stamps, claims and the people you met stay yours.
 - The old copy at mrshn.github.io/travel-app-website isn't updated any more and can't reach your account. If you logged anything there, use its **Settings → Export everything**, then **Import a backup** here.
 
 ## Saving chats with Claude
@@ -61,7 +84,7 @@ tags: [app, how-to]
 In a chat, ask Claude to:
 
 - **"Save this chat to Travels"**: the findings become a note here (research, tips or a chat log), filed under the trip it belongs to.
-- **"Add this trip to Travels"** or **"Update the Rome trip in Travels"**: the plan becomes (or updates) a trip in the app, with days, stops, map pins, bookings and packing.
+- **"Add this trip to Travels"** or **"Update the sample trip in Travels"**: the plan becomes (or updates) a trip in the app, with days, stops, map pins, bookings and packing.
 - **"Plan a trip to …"**: Claude asks a few questions first, researches, and offers to save the result here.
 
 After Claude pushes to GitHub, the site rebuilds in about two minutes. A trip saved here isn't added to your account by itself: add it in **Settings**, under **Try the sample trip**. A copy you took from it, like the sample trip, follows its updates: if you haven't changed its plan, it updates by itself; if you have, an **Update / Keep mine** banner asks first, and updating keeps your ticks, notes and own stops.

@@ -19,13 +19,13 @@ One Markdown file per note: `content/notes/YYYY-MM-DD-short-slug.md` (lowercase,
 
 ```md
 ---
-title: "Rome: our planning chat"      # quote it if it contains a colon
+title: "Lisbon: our planning chat"    # quote it if it contains a colon
 date: 2026-09-30                      # YYYY-MM-DD
 kind: chat                            # chat | research | tips | note | page
-trip: rome-2026-10                    # optional: the trip id it belongs to
+trip: lisbon-2026-11                  # optional: the trip id it belongs to
 summary: One or two sentences shown on the card.
 tags: [rome, chat]
-link: archive/some-page.html          # only for kind: page (a file in public/ or a full URL)
+link: some-page.html                  # only for kind: page (a file in public/ or a full URL)
 ---
 
 Markdown body…
@@ -37,7 +37,7 @@ Markdown body…
 | `research` | Findings with sources (a report, a comparison, a checklist) |
 | `tips` | Reusable advice not tied to one plan (packing, money, apps) |
 | `note` | Anything else |
-| `page` | A pointer to a standalone page kept in `public/archive/` |
+| `page` | A pointer to a standalone page (a file in `public/`, or a full URL) |
 
 Markdown supports headings, lists, tables, quotes, bold/italic, code and links (GitHub style). Raw HTML is shown as text. Link another note by its file name, e.g. `[the report](2026-09-28-rome-research-report.md)`. Images must be `https://` URLs. Notes with four or more `##` headings get a table of contents.
 
@@ -53,7 +53,7 @@ The data model is in `shared/types/trip.ts`; `app/data/rome.ts` is a complete ex
 
 ### Rules that matter
 
-- **`id` and `seedId`**: the same string, `<destination>-<yyyy>-<mm>`, e.g. `lisbon-2026-11`. Never change them after publishing.
+- **`id` and `seedId`**: the same string, `<destination>-<yyyy>-<mm>`, e.g. `lisbon-2026-11`. Never change them after publishing. The Rome sample is the one exception: it is `rome-sample` (made generic after the trip). Never reuse `rome-2026-10`: that is the owner's own copy, and a seed with its id would replace it.
 - **Stop ids never change once published.** Ticks, ratings, notes, photos and costs on people's phones are stored by stop id. When updating a trip keep every existing id; give new stops new ids (a slug of the title, unique within the trip). An option stop keeps its id when its choices change; choice ids should stay stable too.
 - **Place ids never change once published either**: stamps are stored by place id (`sight-pantheon`, `food-armando-al-pantheon`, `photo-pantheon`).
 - **Times** are minutes after midnight of the day's date: 09:30 → `570`. After midnight add 1440: 01:30 the same night → `1530`. `timeLabel` is the text shown ("09:30", "~23:40", "Before 18:45").
@@ -77,7 +77,7 @@ Icon names for `icon` fields: `sun sunset sunrise moon metro train bus taxi walk
 
 ### Optional sections
 
-`bookings` (with `due` dates and `asap`), `bookingTips`, `packing` (strings), `places` (sights/food/photo spots, with `open` per `openDays`), `dishes`, `info` (guide sections made of blocks: `p`, `list`, `table`, `callout`, `tags`, `special`), `sos`, `sosSteps`, `driverCard`, `phrases` (`[local, say it like, meaning]`), `budget` (per day: sights, food, night, transport), `overlay.lines` (metro lines with stations), `fx` (`{ homeCurrency, rate, source }`), `nightCards`, `airport`.
+`meet` (ways to meet people on the trip, the Meet people page: see below), `bookings` (with `due` dates and `asap`), `bookingTips`, `packing` (strings), `places` (sights/food/photo spots, with `open` per `openDays`), `dishes`, `info` (guide sections made of blocks: `p`, `list`, `table`, `callout`, `tags`, `special`), `sos`, `sosSteps`, `driverCard`, `phrases` (`[local, say it like, meaning]`), `budget` (per day: sights, food, night, transport), `overlay.lines` (metro lines with stations), `fx` (`{ homeCurrency, rate, source }`), `nightCards`, `airport`.
 
 ### Places, stamps and costs
 
@@ -110,6 +110,17 @@ data a trip already has; two optional fields cover what the automatic matching m
   **Add cost**, with the amounts to pick from; "Free" or no amount offers nothing. A booking's `cost` with one euro
   amount offers **Log** when it is ticked. `budget` (per day: sights, food, night, transport) is the plan the Costs
   page measures against, and `fx` adds the ≈ amount in the home currency.
+
+### Ways to meet people (`meet`)
+
+The **Meet people** page shows a trip's `meet` ideas (without them, general ideas for any city). Each is a `MeetIdea`:
+`{ id, kind, title, text, icon?, when?, dayId?, link?, ask? }`.
+
+- `id`: stable and unique within the trip; ids starting `any-` are kept for the general ideas.
+- `kind`: `event` (a party, a festival), `tour` (a free walking tour, a pub crawl, a food tour), `app` (Tablo, Hostelworld chats), `place` (a bar where people mix) or `tip`.
+- `text`: one or two sentences; inline Markdown (bold, links) works. Public businesses only, nothing personal.
+- `when`: as it should read ("Nightly from 21:30", "Fri 9 Oct, 10:00 and 11:00"); `dayId` when it belongs to one day (Tonight shows those).
+- `link`: `{ label, url }` where there is one; `ask`: the ready line for a meetup ("Anyone for the pub crawl tonight?").
 
 ### Adding or updating a trip
 
