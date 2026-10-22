@@ -9,6 +9,7 @@ export const romeTrip: Trip = {
  "title": "Rome",
  "destination": "Rome",
  "country": "Italy",
+ "lang": "it-IT",
  "timezone": "Europe/Rome",
  "start": "2026-10-08",
  "end": "2026-10-12",
@@ -6549,6 +6550,73 @@ export const romeTrip: Trip = {
    "Ho perso il passaporto",
    "oh PEHR-soh eel pahs-sah-POR-toh",
    "I lost my passport"
+  ]
+ ],
+ "meetPhrases": [
+  [
+   "Ciao! Piacere, sono…",
+   "chow! pyah-CHEH-reh, SOH-noh",
+   "Hi, nice to meet you, I'm…"
+  ],
+  [
+   "Sei di Roma?",
+   "say dee ROH-mah",
+   "Are you from Rome?"
+  ],
+  [
+   "È la mia prima volta a Roma.",
+   "eh lah MEE-ah PREE-mah VOHL-tah ah ROH-mah",
+   "It's my first time in Rome."
+  ],
+  [
+   "Cosa mi consigli?",
+   "KOH-zah mee kohn-SEEL-yee",
+   "What do you recommend?"
+  ],
+  [
+   "Dove vai stasera?",
+   "DOH-veh vy stah-SEH-rah",
+   "Where are you going tonight?"
+  ],
+  [
+   "Vieni con noi?",
+   "VYEH-nee kohn noy",
+   "Do you want to come with us?"
+  ],
+  [
+   "Mi insegni una parola in romanesco?",
+   "mee een-SEN-yee OO-nah pah-ROH-lah een roh-mah-NES-koh",
+   "Will you teach me a word of Roman dialect?"
+  ],
+  [
+   "Ti va un aperitivo domani?",
+   "tee vah oon ah-peh-ree-TEE-voh doh-MAH-nee",
+   "Fancy an aperitivo tomorrow?"
+  ],
+  [
+   "Sei su Instagram?",
+   "say soo EEN-stah-grahm",
+   "Are you on Instagram?"
+  ],
+  [
+   "Sei simpatica / simpatico.",
+   "say seem-PAH-tee-kah / seem-PAH-tee-koh",
+   "You're fun (to a woman / to a man)."
+  ],
+  [
+   "Daje!",
+   "DAH-yeh",
+   "Come on! Great! (Roman slang)"
+  ],
+  [
+   "No, grazie.",
+   "noh GRAH-tsee-eh",
+   "No, thanks."
+  ],
+  [
+   "È stato un piacere. Ci vediamo!",
+   "eh STAH-toh oon pyah-CHEH-reh. chee veh-DYAH-moh",
+   "It was a pleasure. See you!"
   ]
  ],
  "budget": [

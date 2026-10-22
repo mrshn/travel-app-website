@@ -308,6 +308,15 @@ await test('M2 before the trip there is no Tonight; a trip without its own ideas
   return withDevice({ at: '2026-09-30T12:00', trips: [romeCopy(trip), lisbon] }, async ({ page }) => {
     await openReady(page, 'meet')
     assert(!(await section(page, 'meet-tonight').count()), 'Tonight shows before the trip')
+    // Say hi before the trip: no goal for today, no Tonight on the row, invites said by their weekday.
+    const talk = section(page, 'meet-talk')
+    await talk.waitFor()
+    assert(!(await talk.locator('[data-goal]').count()), 'a goal for today before the trip')
+    assert(!(await page.locator('nav.jump [data-jump="meet-tonight"]').count()), 'Tonight on the row before the trip')
+    await talk.locator('[data-tab="invite"]').click()
+    const firstInvite = flat(await talk.locator('[data-invite]').first().innerText())
+    assert(/, on (Thursday|Friday) at \d\d:\d\d\. Want to come with me\?/.test(firstInvite), `the first invite before the trip: ${firstInvite}`)
+    await talk.locator('[data-tab="start"]').click()
     await page.goto(new URL('trips/lisbon-2026-11/meet', BASE).href, { waitUntil: 'domcontentloaded' })
     await ready(page)
     const ways = section(page, 'meet-ways')
@@ -791,6 +800,99 @@ await test('M16 people you met: add (where prefilled with the stop on now), edit
     assert(!back.deleted && back.name === 'Ana' && back.where === 'Pub crawl', JSON.stringify(back))
   }))
 
+// ---------- M18: Say hi ----------
+
+/** Init script: the phone's speech, recorded (window.__spoken) instead of spoken. */
+function speechStub() {
+  window.__spoken = []
+  try {
+    window.speechSynthesis.speak = u => void window.__spoken.push([u.text, u.lang])
+    window.speechSynthesis.cancel = () => {}
+  }
+  catch { /* no speech here */ }
+}
+
+await test('M18 Say hi, live Fri 9 Oct 21:00: the row to each part of the page, today\'s goal (kept in the day\'s note), lines with your first name to copy, invites from the plan that make a meetup, your friend QR, and Italian read aloud', () =>
+  withDevice({ permissions: ['clipboard-read', 'clipboard-write'] }, async ({ page, ctx }) => {
+    await ctx.addInitScript(speechStub)
+    await openReady(page, 'meet')
+    // The row: each part of the page, in its order; a tap scrolls to it.
+    const jumps = await page.locator('nav.jump [data-jump]').evaluateAll(els => els.map(e => e.textContent.trim()))
+    assert(same(jumps, ['Tonight', 'Say hi', 'People you met', 'Meetups', 'Friends here', 'Ideas']), `the row: ${jumps.join(', ')}`)
+    const order = await page.locator('.meet section h2').evaluateAll(els => els.map(e => e.id))
+    assert(same(order, ['meet-tonight', 'meet-talk', 'meet-people', 'meet-mine', 'meet-friends', 'meet-ways']), `the sections: ${order.join(', ')}`)
+    await page.locator('nav.jump [data-jump="meet-ways"]').click()
+    await until(async () => {
+      const box = await page.locator('#meet-ways').boundingBox()
+      return box && box.y >= 0 && box.y < 260
+    }, 'Ideas scrolled into view')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    // Today's goal: + and -, kept in Friday's note.
+    const talk = section(page, 'meet-talk')
+    const goal = talk.locator('[data-goal]')
+    await goal.waitFor()
+    assert(flat(await goal.innerText()).includes('Say hi to 5 people'), flat(await goal.innerText()))
+    const minus = goal.getByRole('button', { name: 'One fewer' })
+    const plus = goal.getByRole('button', { name: 'I said hi to someone' })
+    assert(await minus.isDisabled(), '- is on at 0')
+    for (let i = 0; i < 4; i++) await plus.click()
+    await until(async () => flat(await goal.innerText()).includes('4 so far, 1 to go'), '4 so far')
+    await plus.click()
+    await toastWith(page, '5 people today. Well done.')
+    assert(flat(await goal.innerText()).includes('Goal reached. Well done.'), 'no goal reached line')
+    assert(await goal.locator('.g-seg.on').count() === 5, 'the bar is not full')
+    await until(async () => (await readProgress(page))?.dayNotes?.fri?.talked === 5, 'talked: 5 in Friday\'s note')
+    await minus.click()
+    await until(async () => (await readProgress(page))?.dayNotes?.fri?.talked === 4, 'talked: 4 after -')
+    // Start: openers with your first name; Copy puts the line on the clipboard.
+    assert(await talk.locator('[data-tab="start"]').getAttribute('aria-pressed') === 'true', 'Start is not the first tab')
+    const hostel = talk.locator('[data-group="hostel"] .line').first()
+    assert(flat(await hostel.innerText()) === '“Hey, I\'m Test. Just got in. How long are you staying?”', flat(await hostel.innerText()))
+    await hostel.getByRole('button', { name: /^Copy: / }).click()
+    await toastWith(page, 'Copied')
+    assert(await page.evaluate(() => navigator.clipboard.readText()) === 'Hey, I\'m Test. Just got in. How long are you staying?', 'the clipboard')
+    // Wrap up: the advice reads as advice (no quotes, no copy), the lines to leave on can be copied.
+    await talk.locator('[data-tab="leave"]').click()
+    const respect = talk.locator('[data-group="respect"]')
+    await respect.waitFor()
+    assert(!(await respect.getByRole('button').count()), 'advice has copy buttons')
+    assert(flat(await respect.innerText()).includes('Ask before a kiss: “Can I kiss you?” Only a clear yes is a yes.'), 'no consent line')
+    assert(await talk.locator('[data-group="exits"]').getByRole('button', { name: /^Copy: / }).count() === 3, 'the exits can\'t be copied')
+    // Invite: the plan's next stops; Make a meetup opens the meetup sheet for that stop.
+    await talk.locator('[data-tab="invite"]').click()
+    const crawl = talk.locator('[data-invite="pick-frinight"]')
+    await crawl.waitFor()
+    assert(flat(await crawl.innerText()).includes(`“${FRI_NIGHT_TITLE}, tonight at 21:30. Want to come with me?”`), flat(await crawl.innerText()))
+    const invites = await talk.locator('[data-invite]').evaluateAll(els => els.map(e => e.dataset.invite))
+    assert(invites.length === 4 && invites[0] === 'pick-frinight', `invites: ${invites.join(', ')}`)
+    await crawl.getByRole('button', { name: 'Make a meetup' }).click()
+    const sh = dialog(page, 'New meetup')
+    await sh.waitFor()
+    assert(query(page, 'meetup') === 'new' && query(page, 'stop') === 'pick-frinight', page.url())
+    assert(await sh.getByLabel(/^Time/).inputValue() === '21:30', 'the meetup\'s time')
+    await page.goBack()
+    await until(() => !query(page, 'meetup'), 'the meetup sheet to close')
+    // Your friend QR: your friend link, as a QR code.
+    await talk.locator('[data-tab="invite"]').click()
+    await talk.getByRole('button', { name: 'Show my friend QR' }).click()
+    await talk.locator('.qr-box svg').waitFor()
+    const invs = Object.values((await cloudOf(page)).invites ?? {})
+    assert(invs.some(i => i.kind === 'friend' && i.from === ME.uid && !i.revoked), 'no friend link made')
+    await talk.getByRole('button', { name: 'Hide my QR code' }).click()
+    await until(async () => !(await talk.locator('.qr-box').count()), 'the QR code to hide')
+    // Italian: the trip's lines for meeting people, read aloud in Italian; the tab is remembered.
+    const local = talk.locator('[data-tab="local"]')
+    assert(flat(await local.innerText()) === 'Italian', `the language tab: ${flat(await local.innerText())}`)
+    await local.click()
+    const ph = talk.locator('[data-group="local"] .ph')
+    assert(await ph.count() === trip.meetPhrases.length, `${await ph.count()} phrases`)
+    assert(flat(await ph.nth(1).innerText()).includes('Sei di Roma?'), flat(await ph.nth(1).innerText()))
+    await ph.first().getByRole('button', { name: /^Hear / }).click()
+    await until(async () => same((await page.evaluate(() => window.__spoken ?? []))[0], [trip.meetPhrases[0][0], 'it-IT']), 'the phrase read aloud in Italian')
+    await openReady(page, 'meet')
+    await until(async () => await section(page, 'meet-talk').locator('[data-tab="local"]').getAttribute('aria-pressed') === 'true', 'the tab remembered')
+  }))
+
 // ---------- M17: every new screen at 390 and 320 px, light and dark ----------
 
 /** A person met, as progress holds it (the device's Seed). */
@@ -829,6 +931,16 @@ for (const width of [390, 320]) {
         await section(page, 'meet-friends').locator('[data-friend]').waitFor()
         await section(page, 'meet-mine').locator('[data-meetup]').waitFor()
         await look(page, 'Meet people')
+        const talk = section(page, 'meet-talk')
+        await talk.getByRole('button', { name: 'I said hi to someone' }).click()
+        for (const t of ['more', 'invite', 'leave', 'local', 'start']) {
+          await talk.locator(`[data-tab="${t}"]`).click()
+          if (t === 'invite') {
+            await talk.getByRole('button', { name: 'Show my friend QR' }).click()
+            await talk.locator('.qr-box svg').waitFor()
+          }
+          await look(page, `Say hi, ${t}`)
+        }
         await openReady(page, 'meet?meetup=new&idea=crawl-ultimate-party')
         await dialog(page, 'New meetup').waitFor()
         await look(page, 'New meetup', { sheet: 'New meetup' })

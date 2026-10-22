@@ -27,6 +27,7 @@ const names = computed(() => {
 
 <style scoped>
 .avs { display: inline-flex; align-items: center; flex: none; }
-.avs > .av + .av, .avs > .more { margin-left: calc(var(--s) * -.28); }
+/* Overlap a fifth of a face: enough to read as a group, little enough that two initials stay readable. */
+.avs > .av + .av, .avs > .more { margin-left: calc(var(--s) * -.2); }
 .more { display: inline-grid; place-items: center; min-width: var(--s); height: var(--s); padding: 0 5px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); font-size: calc(var(--s) * .44); font-weight: 600; box-shadow: 0 0 0 2px var(--surface); }
 </style>

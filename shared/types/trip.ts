@@ -268,6 +268,10 @@ export interface Trip {
   sosSteps?: string[]
   driverCard?: string[]
   phrases?: [string, string, string][]
+  /** Lines in the local language for meeting people, [what to say, say it like, what it means]: Meet people's Say hi. */
+  meetPhrases?: [string, string, string][]
+  /** The local language for speech ("it-IT"); without it, the country's main language (shared/utils/talk.ts). */
+  lang?: string
   budget?: BudgetDay[]
   overlay?: { lines: MetroLine[] }
   variant?: TripVariantSwitch
@@ -340,6 +344,8 @@ export interface DayNote {
   /** Money spent that day outside any stop (water, souvenirs, tickets…), from before costs had their own page.
    *  Read as a "Logged earlier" cost (costEntries); never written any more. */
   extraSpent?: number
+  /** How many people you said hi to that day (Say hi's goal on Meet people). */
+  talked?: number
   updatedAt?: string
 }
 

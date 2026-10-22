@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { InfoBlock } from '#shared/types/trip'
+import { tripLang } from '#shared/utils/talk'
 
 type Kind = Extract<InfoBlock, { t: 'special' }>['kind']
 defineProps<{ kind: Kind }>()
 const v = useTripView()
 const trip = v.trip
+/** The phrases are read aloud in the trip's language (Italian when the trip doesn't say). */
+const speechLang = computed(() => (trip.value ? tripLang(trip.value) : undefined) ?? 'it-IT')
 
 // Converter
 const a = ref<number | null>(10)
@@ -94,7 +97,7 @@ const nx = (m: number) => ((m - X0) / SPAN) * 100
   <!-- Phrases -->
   <div v-else-if="kind === 'phrases' && trip?.phrases?.length" class="card phrases">
     <div v-for="(p, i) in trip.phrases" :key="i" class="ph">
-      <button class="btn icon sm round" type="button" :aria-label="`Hear “${p[0]}”`" @click="speak(p[0])">
+      <button class="btn icon sm round" type="button" :aria-label="`Hear “${p[0]}”`" @click="speak(p[0], speechLang)">
         <AppIcon name="speaker" size="sm" />
       </button>
       <span class="grow">

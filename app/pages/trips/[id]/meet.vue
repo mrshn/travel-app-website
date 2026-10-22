@@ -6,9 +6,9 @@ import { addDays, fmtClock, fmtDate, zoned } from '#shared/utils/time'
 import { meetIdeasFor } from '~/components/MeetIdea.vue'
 
 /**
- * Meet people (spec 5.9; lights More): tonight's options (during the trip), your meetups for this trip, friends in the
- * same place on your dates, ways to meet people, and the people you met. Meetups and friends need the social layer;
- * the rest works offline.
+ * Meet people (spec 5.9 and 13; lights More): tonight's options (during the trip), Say hi (lines to start a chat and
+ * today's goal), the people you met, your meetups for this trip, friends in the same place on your dates, and ways to
+ * meet people. Meetups and friends need the social layer; the rest works offline.
  */
 const v = useTripView()
 const trip = v.trip
@@ -108,6 +108,23 @@ function personLine(p: MetPerson): string {
   return [p.where, date ? fmtDate(date, 'short') : ''].filter(Boolean).join(' · ')
 }
 
+// ---------- on this page ----------
+const jumps = computed(() => [
+  ...(today.value ? [{ id: 'meet-tonight', label: 'Tonight' }] : []),
+  { id: 'meet-talk', label: 'Say hi' },
+  { id: 'meet-people', label: 'People you met' },
+  { id: 'meet-mine', label: 'Meetups' },
+  { id: 'meet-friends', label: 'Friends here' },
+  { id: 'meet-ways', label: 'Ideas' },
+])
+/** Scrolls to a section (its heading clears the trip's header: html's scroll-padding-top). */
+function jump(id: string) {
+  const el = document.getElementById(id)?.closest('section')
+  if (!el) return
+  const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  el.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' })
+}
+
 useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title} · Travels` : 'Meet people · Travels')) })
 </script>
 
@@ -120,9 +137,14 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
       Meet people
     </h1>
     <p class="muted intro">
-      Open invites you can send to any chat, friends in {{ trip.destination }} on your dates, and the people you meet.
+      What's on tonight, lines to say hi, open invites you can send to any chat, and the people you meet.
     </p>
     <MeetState class="state" what="meetups and friends" />
+    <nav class="jump" aria-label="On this page">
+      <button v-for="j in jumps" :key="j.id" type="button" class="chip" :data-jump="j.id" @click="jump(j.id)">
+        {{ j.label }}
+      </button>
+    </nav>
 
     <!-- 1. Tonight -->
     <section v-if="today" class="sec" aria-labelledby="meet-tonight">
@@ -174,7 +196,36 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
       </div>
     </section>
 
-    <!-- 2. Your meetups -->
+    <!-- 2. Say hi: lines, today's goal and your friend link -->
+    <MeetTalk />
+
+    <!-- 3. People you met -->
+    <section class="sec" aria-labelledby="meet-people">
+      <div class="sec-h">
+        <h2 id="meet-people">
+          People you met
+        </h2>
+        <button class="btn sm ghost" type="button" @click="open({ met: 'new' })">
+          <AppIcon name="userplus" size="sm" />Add someone
+        </button>
+      </div>
+      <div v-if="people.length" class="card rows">
+        <button v-for="p in people" :key="p.id" class="row-item prow" type="button" :data-met="p.id" @click="open({ met: p.id })">
+          <Avatar :person="{ uid: p.id, name: p.name }" :size="40" />
+          <span class="grow ptx">
+            <b>{{ p.name }}</b>
+            <span v-if="p.handle" class="small muted">{{ p.handle }}</span>
+            <span v-if="personLine(p)" class="small muted">{{ personLine(p) }}</span>
+          </span>
+          <AppIcon name="chevr" class="chev" />
+        </button>
+      </div>
+      <p v-else class="small muted">
+        Keep the names and handles of people you meet, and send them your friend link. Only you see this list.
+      </p>
+    </section>
+
+    <!-- 4. Your meetups -->
     <section class="sec" aria-labelledby="meet-mine">
       <div class="sec-h">
         <h2 id="meet-mine">
@@ -213,7 +264,7 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
       </p>
     </section>
 
-    <!-- 3. Friends here -->
+    <!-- 5. Friends here -->
     <section class="sec" aria-labelledby="meet-friends">
       <div class="sec-h">
         <h2 id="meet-friends">
@@ -257,7 +308,7 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
       </p>
     </section>
 
-    <!-- 4. Ways to meet people -->
+    <!-- 6. Ways to meet people -->
     <section class="sec" aria-labelledby="meet-ways">
       <div class="sec-h">
         <h2 id="meet-ways">
@@ -270,31 +321,6 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
       </div>
     </section>
 
-    <!-- 5. People you met -->
-    <section class="sec" aria-labelledby="meet-people">
-      <div class="sec-h">
-        <h2 id="meet-people">
-          People you met
-        </h2>
-        <button class="btn sm ghost" type="button" @click="open({ met: 'new' })">
-          <AppIcon name="userplus" size="sm" />Add someone
-        </button>
-      </div>
-      <div v-if="people.length" class="card rows">
-        <button v-for="p in people" :key="p.id" class="row-item prow" type="button" :data-met="p.id" @click="open({ met: p.id })">
-          <Avatar :person="{ uid: p.id, name: p.name }" :size="40" />
-          <span class="grow ptx">
-            <b>{{ p.name }}</b>
-            <span v-if="p.handle" class="small muted">{{ p.handle }}</span>
-            <span v-if="personLine(p)" class="small muted">{{ personLine(p) }}</span>
-          </span>
-          <AppIcon name="chevr" class="chev" />
-        </button>
-      </div>
-      <p v-else class="small muted">
-        Keep the names and handles of people you meet, and send them your friend link. Only you see this list.
-      </p>
-    </section>
   </div>
 </template>
 
@@ -302,6 +328,8 @@ useHead({ title: computed(() => (trip.value ? `Meet people · ${trip.value.title
 .meet { padding-top: 18px; max-width: 860px; }
 .intro { margin-top: 6px; font-size: 15px; line-height: 1.5; }
 .state { margin-top: 14px; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.jump .chip { min-height: 32px; padding: 4px 12px; font-size: 13.5px; color: var(--fg); }
 .sec .sec-h { align-items: center; }
 .sec .sec-h .btn { flex: none; }
 .stack { gap: 12px; }

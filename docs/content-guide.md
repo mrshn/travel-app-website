@@ -77,7 +77,7 @@ Icon names for `icon` fields: `sun sunset sunrise moon metro train bus taxi walk
 
 ### Optional sections
 
-`meet` (ways to meet people on the trip, the Meet people page: see below), `bookings` (with `due` dates and `asap`), `bookingTips`, `packing` (strings), `places` (sights/food/photo spots, with `open` per `openDays`), `dishes`, `info` (guide sections made of blocks: `p`, `list`, `table`, `callout`, `tags`, `special`), `sos`, `sosSteps`, `driverCard`, `phrases` (`[local, say it like, meaning]`), `budget` (per day: sights, food, night, transport), `overlay.lines` (metro lines with stations), `fx` (`{ homeCurrency, rate, source }`), `nightCards`, `airport`.
+`meet` (ways to meet people on the trip, the Meet people page: see below), `bookings` (with `due` dates and `asap`), `bookingTips`, `packing` (strings), `places` (sights/food/photo spots, with `open` per `openDays`), `dishes`, `info` (guide sections made of blocks: `p`, `list`, `table`, `callout`, `tags`, `special`), `sos`, `sosSteps`, `driverCard`, `phrases` (`[local, say it like, meaning]`), `meetPhrases` (the same shape: lines for meeting people, shown under Say hi on Meet people; without them Say hi shows `phrases`), `lang` (the local language for reading phrases aloud, such as `"it-IT"`; without it the country's main language, or Italian), `budget` (per day: sights, food, night, transport), `overlay.lines` (metro lines with stations), `fx` (`{ homeCurrency, rate, source }`), `nightCards`, `airport`.
 
 ### Places, stamps and costs
 

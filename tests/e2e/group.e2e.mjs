@@ -644,6 +644,58 @@ try {
     await ctx.close()
   }
 
+  // ================= Decide during the trip, and a new trip with friends =================
+  {
+    const { ctx, page, errors } = await device({ at: FRI_1720, path: 'now' })
+    const gid = await makeGroup(page)
+    await joinAs(page, ALI, gid)
+    await act(page, ALI, 'setVote', gid, 'pick-ride', 'taxi')
+    await act(page, ALI, 'setVote', gid, 'pick-frinight', 'clubs')
+
+    await check('G12 Decide on Fri 9 Oct at 17:20: the options still ahead first, from Friday night; Thursday\'s ride folded under "Earlier · 1", with its vote', async () => {
+      await open(page, 'group?tab=decide')
+      const ahead = page.locator('.decide section').first().locator(':scope > .opts > article.opt')
+      await ahead.first().waitFor()
+      const first = flat(await ahead.first().innerText())
+      // The day and time are a kicker, upper case on screen.
+      assert(first.toLowerCase().includes('fri 9 oct · 21:30') && first.includes('Pick your Friday night'), first.slice(0, 80))
+      const aheadText = flat(await page.locator('.decide section').first().locator(':scope > .opts').innerText())
+      assert(!aheadText.includes('Pick your ride into Rome'), 'Thursday\'s ride is among the options ahead')
+      const earlier = page.locator('details.earlier')
+      assert(flat(await earlier.locator('summary').innerText()) === 'Earlier · 1', flat(await earlier.locator('summary').innerText()))
+      assert(await earlier.getAttribute('open') === null, 'Earlier is open before a tap')
+      await earlier.locator('summary').click()
+      const past = earlier.locator('article.opt')
+      await past.first().waitFor()
+      const text = flat(await past.first().innerText())
+      assert(text.includes('Pick your ride into Rome') && text.includes('Votes: Taxi €55 1'), text.slice(0, 200))
+    })
+
+    await check('G13 a new trip "With friends" opens on Together with Invite people; "Just me" opens its plan', async () => {
+      await open(page, '/trips/new')
+      const friends = page.getByRole('button', { name: 'With friends' })
+      assert(await page.getByRole('button', { name: 'Just me' }).getAttribute('aria-pressed') === 'true', 'Just me is not the default')
+      await friends.click()
+      assert(await friends.getAttribute('aria-pressed') === 'true', 'With friends is not pressed')
+      await page.getByPlaceholder('e.g. Lisbon').first().fill('Lisbon')
+      const told = toastWith(page, 'Trip created. Invite your friends to plan it with you.')
+      await page.getByRole('button', { name: 'Create trip' }).click()
+      await told
+      await until('Together with ?invite=1', async () => {
+        const u = new URL(page.url())
+        return /^\/trips\/[^/]+\/group$/.test(u.pathname.replace(/\/$/, '')) && u.searchParams.get('invite') === '1'
+      })
+      await page.getByRole('dialog', { name: 'Invite people' }).waitFor()
+      await page.keyboard.press('Escape')
+      await open(page, '/trips/new')
+      await page.getByPlaceholder('e.g. Lisbon').first().fill('Porto')
+      await page.getByRole('button', { name: 'Create trip' }).click()
+      await until('the new trip\'s plan', async () => /^\/trips\/[^/]+\/plan$/.test(new URL(page.url()).pathname.replace(/\/$/, '')))
+    })
+    await check('no page errors on Decide and New trip', async () => assert(!errors.length, errors.join(' / ')))
+    await ctx.close()
+  }
+
   // ================= The device as a viewer of Ali's plan =================
   {
     const { ctx, page, errors } = await device({ path: 'now' })
@@ -890,6 +942,7 @@ try {
       'app/components/HomeCard.vue', 'app/components/StopEditor.vue', 'app/components/GroupChat.vue', 'app/components/GroupPeople.vue',
       'app/components/GroupDecide.vue', 'app/components/GroupNotice.vue', 'app/components/AvatarStack.vue', 'app/components/GroupWhereButton.vue',
       'app/components/ChatMessage.vue', 'app/components/ChatComposer.vue', 'app/components/ChatStopPicker.vue', 'tests/e2e/group.e2e.mjs',
+      'app/components/MeetTalk.vue', 'shared/utils/talk.ts', 'app/pages/trips/new.vue', 'tests/e2e/meet.e2e.mjs', 'tests/talk.test.ts',
     ]
     const bad = files.filter(f => readFileSync(join(ROOT, f), 'utf8').includes(EM_DASH))
     assert(!bad.length, `em dash in ${bad.join(', ')}`)

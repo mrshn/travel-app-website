@@ -40,7 +40,8 @@ tags: [app, how-to]
 - Everyone sees one plan. If two of you change it at the same time, both changes are kept (stop by stop). Your ticks, ratings, notes, photos, costs and stamps stay yours.
 - **Chat**: say something, send a photo, a stop ("let's meet here") or where you are (one pin, never tracking).
 - **People**: everyone's status. Tap a quick one: On my way, Running late, At the stop you're at, Free now, Home safe. The organiser can change roles or remove someone; anyone can leave (keeping a copy of the trip).
-- **Decide**: picking an option ("Pick your Friday night") is also your vote; the group sees the votes, and an editor makes the leader the group's pick. Who's in for the next stops shows here and in each stop's sheet (**I'm in**, **Maybe**, **Not me**).
+- **Decide**: picking an option ("Pick your Friday night") is also your vote; the group sees the votes, and an editor makes the leader the group's pick. What's still ahead comes first; options already past fold under **Earlier**. Who's in for the next stops shows here and in each stop's sheet (**I'm in**, **Maybe**, **Not me**).
+- Planning a new trip with friends? On **New trip**, choose **With friends** under *Who's coming?*: the trip opens on Together with **Invite people**.
 - On Now, a line shows where everyone is; late at night, the Getting back card has **I'm home safe**.
 
 ## Friends, posts and meeting people
@@ -49,6 +50,7 @@ tags: [app, how-to]
 - **Share a moment** from a stop or from your day (Plan, *Your day*): text and one photo, for your friends only. Like and comment; the bell shows likes, comments, requests and invites.
 - **Let friends see where I'm going** (under **You**, off until you turn it on): friends see your trips' places and dates, and you see who's travelling now, soon, or in the same city as you.
 - **Meet people** (More, or a stop's **Ask people to join**): tonight's options, ways to meet people in the city, friends in town, and **meetups**: a link with a time and a place ("Anyone for the Vatican at 8 on Friday?") you can paste in the hostel's chat or WhatsApp. Anyone can open it; saying **I'm in** needs an account. Keep the **people you met** there too, and send them your friend link.
+- **Say hi** (Meet people): three rules (go within three seconds; ask two, share one; end with an invite), then lines to copy or just say: **Start**, **Keep going**, **Invite** (made from your next stops, each one a meetup link in a tap, plus your friend QR to swap on the spot), **Wrap up** (reading the moment, consent, leaving kindly) and the local language, with a speaker to hear each line. During the trip, tap **+** each time you say hi to someone new: the goal is five a day.
 - **Share this plan** (More): invite people to plan it with you or to follow along, or make a **plan link**: a copy anyone can open and copy to their own trips (where you stay is left out unless you tick it). Remove a link any time under **Friends → You**.
 
 ## When plans change
