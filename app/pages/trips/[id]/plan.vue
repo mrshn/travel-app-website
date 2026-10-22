@@ -233,6 +233,7 @@ onMounted(() => {
           <AppIcon :name="alertsOpen ? 'chevu' : 'chev'" size="sm" />{{ alertsOpen ? 'Hide' : moreAlerts === 1 ? '1 more heads-up' : `${moreAlerts} more heads-ups` }}
         </button>
       </div>
+      <PlanDayTools :day-id="day.id" />
 
       <div class="cols">
         <div class="main">
@@ -261,7 +262,7 @@ onMounted(() => {
             <h3>No stops yet</h3>
             <p>Add what you want to do and when; the Now screen will guide you through it.</p>
           </div>
-          <button class="btn ghost block add" type="button" @click="addStop">
+          <button v-if="v.canEdit.value" class="btn ghost block add" type="button" @click="addStop">
             <AppIcon name="plus" size="sm" />Add a stop to {{ fmtDate(day.date, 'weekdayLong') }}
           </button>
         </div>
@@ -335,6 +336,7 @@ onMounted(() => {
                 </NuxtLink>
               </div>
             </div>
+            <DayShare :day-id="day.id" />
           </section>
         </aside>
       </div>

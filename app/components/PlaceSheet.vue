@@ -220,7 +220,7 @@ const site = computed(() => p.value?.links?.[0])
           </a>
         </div>
 
-        <button v-if="!hit" class="btn sm ghost add" type="button" @click="addToPlan">
+        <button v-if="!hit && v.canEdit.value" class="btn sm ghost add" type="button" @click="addToPlan">
           <AppIcon name="plus" size="sm" />Add to plan
         </button>
       </div>

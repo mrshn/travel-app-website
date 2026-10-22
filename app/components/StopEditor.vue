@@ -3,6 +3,7 @@ import type { Stop, StopKind, StopTag } from '#shared/types/trip'
 import { parseLatLng } from '#shared/utils/geo'
 import { placeFirstClock } from '#shared/utils/places'
 import { editableStops, findStop, slugify, uid } from '#shared/utils/plan'
+import { socialFirstName } from '#shared/utils/social'
 import { fmtClock } from '#shared/utils/time'
 
 const v = useTripView()
@@ -12,7 +13,35 @@ const geo = useGeo()
 
 const isNew = computed(() => editor.value.value === 'new')
 const found = computed(() => (editor.value.value && !isNew.value && v.trip.value ? findStop(v.trip.value, editor.value.value) : null))
-const open = computed(() => isNew.value || !!found.value)
+// A group trip you can only view keeps its plan as the group made it (docs/design/2026-10-14-together.md, T22).
+const open = computed(() => v.canEdit.value && (isNew.value || !!found.value))
+watch(() => !!editor.value.value && !!v.trip.value && !v.canEdit.value, (refused) => {
+  if (!refused) return
+  toast('You can view this trip, so its plan stays as the group made it.', { tone: 'info', ms: 4000 })
+  const q = { ...route.query }
+  delete q.edit
+  void navigateTo({ query: q }, { replace: true })
+}, { immediate: true })
+
+// ---------- saying in a group trip's chat what changed ----------
+const tg = useTripGroup()
+/** "Fri 9": a day of the plan, short. */
+function dayShort(dayId: string): string {
+  const d = v.trip.value?.days.find(x => x.id === dayId)
+  return d ? `${fmtDate(d.date, 'weekday')} ${Number(d.date.slice(8, 10))}` : ''
+}
+/** One line for the chat: "Ali added “Gelato” on Fri 9", "… moved “X” to Sat 10", "… changed “X” to 17:30". */
+function changeLine(before: { stop: Stop, dayId: string } | null, after: Stop, dayId: string): string {
+  const who = socialFirstName(tg.me.value?.name ?? '')
+  const what = `“${after.title}”`
+  if (!before) return `${who} added ${what} on ${dayShort(dayId)}`
+  const timeMoved = before.stop.start !== after.start
+  if (before.dayId !== dayId) return `${who} moved ${what} to ${dayShort(dayId)}${timeMoved ? ` at ${fmtClock(after.start)}` : ''}`
+  if (timeMoved) return `${who} changed ${what} to ${fmtClock(after.start)}`
+  return `${who} changed ${what}`
+}
+/** What a change to a stop is about (not the bookkeeping, as a time label or an empty place). */
+const gist = (s: Stop) => JSON.stringify([s.title, s.start, s.end ?? null, s.kind, s.tip ?? '', s.cost ?? '', [...(s.tags ?? [])].sort(), !!s.minor, s.place ? [s.place.name, s.place.lat, s.place.lng] : null])
 
 interface FormState {
   title: string
@@ -187,12 +216,15 @@ function save() {
   }
   if (next.end === undefined) delete next.end
   const variant = v.variant.value
+  const before = found.value ? { stop: found.value.stop, dayId: found.value.day.id } : null
+  const changed = !before || before.dayId !== f.dayId || gist(before.stop) !== gist(next)
   if (found.value && found.value.day.id !== f.dayId) {
     v.trips.moveStop(t.id, found.value.day.id, f.dayId, found.value.variant ?? variant, next)
   }
   else {
     v.trips.upsertStop(t.id, f.dayId, found.value?.variant ?? variant, next)
   }
+  if (tg.isGroup.value && changed) tg.announce(changeLine(before, next, f.dayId))
   toast(found.value ? 'Stop updated' : 'Stop added to your plan', { tone: 'ok' })
   editor.close()
 }
@@ -200,8 +232,10 @@ function save() {
 function remove() {
   const t = v.trip.value
   if (!t || !found.value) return
-  if (!confirm(`Delete “${found.value.stop.title}” from your plan?`)) return
+  const title = found.value.stop.title
+  if (!confirm(`Delete “${title}” from your plan?`)) return
   v.trips.removeStop(t.id, found.value.day.id, found.value.variant ?? v.variant.value, found.value.stop.id)
+  if (tg.isGroup.value) tg.announce(`${socialFirstName(tg.me.value?.name ?? '')} removed “${title}”`)
   toast('Stop deleted')
   const q = { ...route.query }
   delete q.edit

@@ -1,16 +1,19 @@
-// Generated from the Rome research plan (September 2026). Edit freely: the app copies it into your browser on first run.
+// The sample trip ("Try the sample trip"): five days in Rome, researched in September 2026, for anyone to make their own.
+// Its id and seedId are "rome-sample". Copies of the earlier version of this plan, on people's phones, hold the id and
+// seedId "rome-2026-10": never ship a trip with either, or the app would update those copies or offer to replace them.
 import type { Trip } from '#shared/types/trip'
 
 export const romeTrip: Trip = {
- "id": "rome-2026-10",
- "seedId": "rome-2026-10",
+ "id": "rome-sample",
+ "seedId": "rome-sample",
  "title": "Rome",
  "destination": "Rome",
  "country": "Italy",
+ "lang": "it-IT",
  "timezone": "Europe/Rome",
  "start": "2026-10-08",
  "end": "2026-10-12",
- "subtitle": "First trip abroad · solo · YellowSquare",
+ "subtitle": "A sample plan · 5 days · solo · social hostel",
  "cover": {
   "scene": "skyline",
   "tod": "sunset"
@@ -22,12 +25,12 @@ export const romeTrip: Trip = {
   "source": "ECB, 25 Sep 2026"
  },
  "home": {
-  "label": "YellowSquare",
-  "name": "YellowSquare Rome",
-  "address": "Via Palestro 51, 00185 Roma",
-  "lat": 41.9055,
-  "lng": 12.5026,
-  "query": "YellowSquare Rome, Via Palestro 51, Rome"
+  "label": "Your hostel",
+  "name": "Your hostel (example)",
+  "address": "Castro Pretorio, 00185 Roma (example area)",
+  "lat": 41.9062,
+  "lng": 12.5055,
+  "query": "Metro Castro Pretorio, Rome"
  },
  "airport": {
   "name": "Fiumicino (FCO)",
@@ -41,7 +44,7 @@ export const romeTrip: Trip = {
    "date": "2026-10-08",
    "num": "VIII",
    "label": "Arrival",
-   "title": "Barcelona to your bed in Rome",
+   "title": "From your flight to your bed in Rome",
    "cover": {
     "scene": "plane",
     "tod": "night"
@@ -49,7 +52,7 @@ export const romeTrip: Trip = {
    "facts": [
     {
      "icon": "plane",
-     "text": "Wizz Air · BCN 21:45 → FCO ~23:40"
+     "text": "Your flight 21:45 → FCO ~23:40"
     },
     {
      "icon": "metro",
@@ -57,7 +60,7 @@ export const romeTrip: Trip = {
     },
     {
      "icon": "bed",
-     "text": "Bed held until 04:00"
+     "text": "Late arrival: tell your hostel"
     }
    ],
    "stops": [
@@ -67,7 +70,7 @@ export const romeTrip: Trip = {
      "timeLabel": "Before 18:30",
      "kind": "food",
      "icon": "food",
-     "title": "Eat dinner in Barcelona",
+     "title": "Eat dinner before you fly",
      "end": 1065,
      "tip": "Rome's food hall at Termini closes at 23:30, before you land.",
      "minor": true
@@ -79,16 +82,10 @@ export const romeTrip: Trip = {
      "kind": "task",
      "icon": "task",
      "title": "Online check-in done, boarding pass printed",
-     "tip": "Wizz check-in opened at 21:45 on Wed 7 Oct and closes at 18:45 today; after that the desk charges €40–50. Print the pass: the desk must stamp it, and a phone pass may not be stampable.",
+     "tip": "Do it before your airline's deadline (on some budget airlines, 2 to 3 hours before departure): checking in at the airport desk can cost €40 or more. Print the pass if your airline wants paper or a desk check.",
      "cost": "Free",
      "tags": [
       "must"
-     ],
-     "links": [
-      {
-       "label": "Wizz check-in",
-       "url": "https://www.wizzair.com/en-gb/help-centre/check-in-and-boarding/check-in/check-in-process"
-      }
      ],
      "minor": true
     },
@@ -98,9 +95,9 @@ export const romeTrip: Trip = {
      "timeLabel": "18:30",
      "kind": "move",
      "icon": "bus",
-     "title": "Aerobús A2 to Terminal 2",
+     "title": "Bus or train to the airport",
      "end": 1155,
-     "tip": "From Plaça de Catalunya, 25–35 min; take the A2, not the A1, and pay the driver by card. Or the R2 Nord train from Sants (~19 min) or Passeig de Gràcia (~26 min), every 30 min, straight into T2: take one train earlier than you need.",
+     "tip": "Check how long the ride takes, and take one earlier than you need.",
      "cost": "€7.45",
      "minor": true
     },
@@ -110,8 +107,8 @@ export const romeTrip: Trip = {
      "timeLabel": "19:15–19:30",
      "kind": "move",
      "icon": "flight",
-     "title": "Arrive at Barcelona Terminal 2",
-     "tip": "At Terminal 1 by mistake? A free shuttle runs every 4–7 min.",
+     "title": "Arrive at the airport",
+     "tip": "Check which terminal your flight leaves from.",
      "minor": true
     },
     {
@@ -120,9 +117,9 @@ export const romeTrip: Trip = {
      "timeLabel": "19:45–21:05",
      "kind": "task",
      "icon": "task",
-     "title": "Wizz desk: document check and boarding-pass stamp",
+     "title": "Airline desk: bag drop or document check",
      "end": 1265,
-     "tip": "Required for non-EU passports even after online check-in. Desks close about 21:05. The desk area can be barely marked, so ask staff. Skipping it can mean no boarding.",
+     "tip": "Check-in and bag drop close 40–60 minutes before departure, depending on the airline. Some airlines check non-EU passports at the desk even after online check-in: skipping it can mean no boarding. If the desk is hard to find, ask staff.",
      "cost": "Free",
      "tags": [
       "must"
@@ -136,7 +133,7 @@ export const romeTrip: Trip = {
      "kind": "task",
      "icon": "shield",
      "title": "Security",
-     "tip": "Plan on the 100 ml rule (new scanners are confirmed only at T1): liquids in one clear 1-litre bag. One power bank, max 100 Wh, in your under-seat bag, never used in flight.",
+     "tip": "Plan on the 100 ml rule unless your airport says its new scanners allow more: liquids in one clear 1-litre bag. One power bank, max 100 Wh, in your under-seat bag, never used in flight.",
      "minor": true
     },
     {
@@ -155,9 +152,9 @@ export const romeTrip: Trip = {
      "timeLabel": "21:45",
      "kind": "move",
      "icon": "flight",
-     "title": "Fly to Rome Fiumicino (FCO), land ~23:40",
+     "title": "Your flight to Rome Fiumicino (FCO), land ~23:40",
      "end": 1420,
-     "tip": "You may arrive at Terminal 1 or 3 (sources disagree). Follow “Uscita / Exit”.",
+     "tip": "Check which terminal your flight lands at (usually 1 or 3). Follow “Uscita / Exit”.",
      "scene": "plane"
     },
     {
@@ -167,7 +164,7 @@ export const romeTrip: Trip = {
      "kind": "task",
      "icon": "shield",
      "title": "Possible police document check",
-     "tip": "Since 1 Aug 2026 Italy has run targeted checks on non-EU travellers arriving from Spain, renewed every 15 days (last confirmed to 1 Oct). Walk off the plane with your folder in hand. If stopped: “Tourist, four days, YellowSquare hostel, I fly home Monday with Pegasus.” Allow 10–30 minutes.",
+     "tip": "Italy can run document checks on flights from other Schengen countries, so carry your passport. Walk off the plane with your documents in hand. If stopped: “Tourist, four days, staying at a hostel in Rome, flying home on Monday.” Allow 10–30 minutes.",
      "tags": [
       "must"
      ],
@@ -193,7 +190,7 @@ export const romeTrip: Trip = {
         "title": "Leonardo Express, 23:53 (last train)",
         "lines": [
          "Only if you're in arrivals by about 23:40 and weren't stopped for a check.",
-         "32 min to Termini (arrives about 00:25), then about 10 min on foot to the hostel.",
+         "32 min to Termini (arrives about 00:25), then on foot or a short ride to where you stay.",
          "Buy only when you're sure you'll make it (machine or Trenitalia app) and validate a paper ticket; the fine is €50+.",
          "Some sites say 23:23 or 23:27. The official timetable says 23:53."
         ],
@@ -221,7 +218,7 @@ export const romeTrip: Trip = {
         "title": "SIT Bus Shuttle from Terminal 3, stand 16",
         "lines": [
          "Leaves 23:50 · 00:15 · 00:40 · 01:15.",
-         "Arrives Termini, Via Marsala 5 (about 00:40 · 01:05 · 01:25 · 02:00), about 5 min on foot from YellowSquare.",
+         "Arrives Termini, Via Marsala 5 (about 00:40 · 01:05 · 01:25 · 02:00), on the side of Termini nearest Castro Pretorio.",
          "The one-way price isn't published; tickets cost €2 more at the stop.",
          "Landed at Terminal 1? Walk through arrivals to Terminal 3."
         ],
@@ -256,8 +253,8 @@ export const romeTrip: Trip = {
         ],
         "place": {
          "name": "Official white taxi, €55 fixed",
-         "lat": 41.9055,
-         "lng": 12.5026,
+         "lat": 41.9062,
+         "lng": 12.5055,
          "query": "Official white taxi, €55 fixed, Rome"
         },
         "kind": "move",
@@ -282,18 +279,12 @@ export const romeTrip: Trip = {
      "timeLabel": "00:45–01:15",
      "kind": "rest",
      "icon": "bed",
-     "title": "Check in at YellowSquare, Via Palestro 51",
+     "title": "Check in at your hostel",
      "end": 1560,
      "tip": "Show your passport and sign the registration: that's your “dichiarazione di presenza”. Pay the city tax (€3.50 × 4 nights), lock your valuables, sleep. Walk on the Via Marsala side of Termini; don't linger around Piazza dei Cinquecento or the Via Giolitti side at night.",
      "cost": "€14 city tax",
      "bookingId": "hostel",
-     "scene": "hostel",
-     "links": [
-      {
-       "label": "YellowSquare FAQ",
-       "url": "https://yellowsquare.com/faqs/"
-      }
-     ]
+     "scene": "hostel"
     }
    ],
    "alerts": [
@@ -301,21 +292,21 @@ export const romeTrip: Trip = {
      "from": 1020,
      "to": 1066,
      "icon": "alert",
-     "text": "Wizz online check-in closes at 18:45. After that the airport desk charges €40–50.",
+     "text": "Online check-in for your flight: do it before your airline's deadline. Checking in at the airport desk can cost €40 or more.",
      "tone": "warn"
     },
     {
      "from": 1185,
      "to": 1265,
      "icon": "check",
-     "text": "Non-EU passport: get your boarding pass stamped at the Wizz desk before about 21:05.",
+     "text": "Check-in and bag drop close 40–60 minutes before departure, depending on the airline. Need a document check at the desk? Go now.",
      "tone": "warn"
     },
     {
      "from": 1390,
      "to": 1440,
      "icon": "shield",
-     "text": "Have passport, hostel booking, Pegasus ticket and insurance in your hand for a possible police check."
+     "text": "Have your passport, hostel booking, return ticket and insurance in your hand for a possible police check."
     },
     {
      "from": 1415,
@@ -330,14 +321,14 @@ export const romeTrip: Trip = {
     "nodes": [
      {
       "time": "18:30",
-      "name": "Plaça de Catalunya",
-      "sub": "Aerobús A2 to T2",
+      "name": "To the airport",
+      "sub": "bus or train",
       "mode": ""
      },
      {
       "time": "19:15",
-      "name": "Barcelona T2",
-      "sub": "Wizz desk stamp, security",
+      "name": "Your airport",
+      "sub": "bag drop, security",
       "mode": ""
      },
      {
@@ -345,7 +336,7 @@ export const romeTrip: Trip = {
       "name": "Rome Fiumicino",
       "sub": "possible police check",
       "mode": "fly",
-      "label": "Wizz Air 21:45"
+      "label": "Your flight 21:45"
      },
      {
       "time": "~00:25",
@@ -355,8 +346,8 @@ export const romeTrip: Trip = {
      },
      {
       "time": "~00:45",
-      "name": "YellowSquare",
-      "sub": "Via Palestro 51",
+      "name": "Your hostel",
+      "sub": "where you stay",
       "mode": "walk"
      }
     ]
@@ -373,11 +364,11 @@ export const romeTrip: Trip = {
        },
        {
         "icon": "bed",
-        "text": "Hostel booking (YellowSquare, from Thu 8 Oct)"
+        "text": "Your hostel booking (from Thu 8 Oct)"
        },
        {
         "icon": "plane",
-        "text": "Pegasus e-ticket for Mon 12 Oct"
+        "text": "Your ticket home for Mon 12 Oct"
        },
        {
         "icon": "shield",
@@ -395,7 +386,7 @@ export const romeTrip: Trip = {
       "items": [
        {
         "icon": "check",
-        "text": "The Via Marsala side (north-east, towards the hostel) is your side."
+        "text": "The Via Marsala side (north-east, towards Castro Pretorio) is your side."
        },
        {
         "icon": "alert",
@@ -797,9 +788,9 @@ export const romeTrip: Trip = {
        {
         "id": "hostel",
         "label": "Hostel party",
-        "title": "YellowSquare's own party",
+        "title": "Your hostel's own party",
         "lines": [
-         "A concert or party runs every night. Sit at the bar and say hi: the easiest start."
+         "Social hostels often run a party, a pub crawl or live music most nights. Sit at the bar and say hi: the easiest start."
         ],
         "place": null,
         "kind": "night",
@@ -2207,9 +2198,9 @@ export const romeTrip: Trip = {
        {
         "id": "hostel",
         "label": "Hostel party",
-        "title": "YellowSquare's party",
+        "title": "Your hostel's party",
         "lines": [
-         "Sunday is quiet in the clubs (no Resident Advisor events), so the hostel is the best bet."
+         "Sunday is quiet in the clubs (no Resident Advisor events), so your hostel is the best bet."
         ],
         "place": null,
         "kind": "night",
@@ -2678,9 +2669,9 @@ export const romeTrip: Trip = {
          {
           "id": "hostel",
           "label": "Hostel party",
-          "title": "YellowSquare's party",
+          "title": "Your hostel's party",
           "lines": [
-           "Sunday is quiet in the clubs (no Resident Advisor events), so the hostel is the best bet."
+           "Sunday is quiet in the clubs (no Resident Advisor events), so your hostel is the best bet."
           ],
           "place": null,
           "kind": "night",
@@ -2784,7 +2775,7 @@ export const romeTrip: Trip = {
     },
     {
      "icon": "plane",
-     "text": "Pegasus 14:50"
+     "text": "Your flight home 14:50"
     },
     {
      "icon": "alert",
@@ -2799,7 +2790,7 @@ export const romeTrip: Trip = {
      "kind": "rest",
      "icon": "bed",
      "title": "Check out and leave your bag at reception",
-     "tip": "Ask the night before: bag storage on checkout day is common but not confirmed for YellowSquare. Backup: KiPoint/KiBag inside Termini, Via Giolitti 34/40 by platform 24, 07:00–21:00, from €6 a bag.",
+     "tip": "Ask the night before: most hostels keep bags on checkout day, but not all. Backup: KiPoint/KiBag inside Termini, Via Giolitti 34/40 by platform 24, 07:00–21:00, from €6 a bag.",
      "links": [
       {
        "label": "KiBag",
@@ -3029,9 +3020,9 @@ export const romeTrip: Trip = {
      "timeLabel": "~11:50",
      "kind": "move",
      "icon": "flight",
-     "title": "Terminal 3: Pegasus counter, security, passport control",
+     "title": "Your terminal: airline desk, security, passport control",
      "end": 850,
-     "tip": "The counter closes 13:50. At exit control your passport is scanned and your face and/or fingerprints are checked against your entry record (EU Entry/Exit System); no stamp. There's no queue data for FCO, hence the buffer. Latest safe arrival at T3: about 12:20.",
+     "tip": "Check-in and bag drop close (usually 60 minutes before): about 13:50 for a 14:50 flight. Flying out of the Schengen area, your passport is scanned at exit control and your face and/or fingerprints are checked against your entry record (EU Entry/Exit System); no stamp. There's no queue data for FCO, hence the buffer. Latest safe arrival: about 12:20.",
      "tags": [
       "must"
      ],
@@ -3053,9 +3044,9 @@ export const romeTrip: Trip = {
      "timeLabel": "14:50",
      "kind": "move",
      "icon": "flight",
-     "title": "Pegasus to Istanbul Sabiha Gökçen (or your Turkish destination)",
+     "title": "Your flight home",
      "end": 960,
-     "tip": "If you're a Turkish citizen, nothing extra is needed to enter Türkiye. Buon viaggio!",
+     "tip": "Buon viaggio!",
      "scene": "plane"
     }
    ],
@@ -3077,7 +3068,7 @@ export const romeTrip: Trip = {
      "from": 700,
      "to": 850,
      "icon": "plane",
-     "text": "Pegasus counter closes at 13:50; be at the gate by 14:10.",
+     "text": "Check-in and bag drop close (usually 60 minutes before): about 13:50. Be at the gate by 14:10.",
      "tone": "warn"
     }
    ],
@@ -3104,13 +3095,13 @@ export const romeTrip: Trip = {
      },
      {
       "time": "11:37",
-      "name": "Fiumicino T3",
+      "name": "Fiumicino",
       "sub": "Leonardo Express 11:05",
       "mode": "ride"
      },
      {
       "time": "13:50",
-      "name": "Pegasus counter closes",
+      "name": "Check-in and bag drop close",
       "sub": "then security + passport control",
       "mode": "walk"
      },
@@ -3123,15 +3114,15 @@ export const romeTrip: Trip = {
      {
       "time": "14:50",
       "name": "Take off",
-      "sub": "Pegasus",
+      "sub": "your flight home",
       "mode": ""
      },
      {
       "time": "",
-      "name": "Istanbul Sabiha Gökçen",
-      "sub": "or your Turkish destination",
+      "name": "Home",
+      "sub": "buon viaggio",
       "mode": "fly",
-      "label": "Pegasus 14:50"
+      "label": "Your flight home 14:50"
      }
     ]
    },
@@ -3180,17 +3171,11 @@ export const romeTrip: Trip = {
    "id": "hostel",
    "due": "2026-09-28",
    "dueLabel": "Now",
-   "title": "Book YellowSquare: check-in Thu 8 Oct, check-out Mon 12 Oct (4 nights)",
+   "title": "Book a hostel: check-in Thu 8 Oct, check-out Mon 12 Oct (4 nights)",
    "asap": true,
    "key": "Hostel",
-   "detail": "Not from the 9th, even though you arrive after midnight. Then send your flight and arrival time (about 01:00) on WhatsApp: +39 064463554.",
+   "detail": "Book from the 8th, not the 9th, even though you arrive after midnight. Then tell the hostel your arrival time (about 01:00).",
    "cost": "dorm ~€35–70/night + €3.50/night tax",
-   "links": [
-    {
-     "label": "yellowsquare.com",
-     "url": "https://yellowsquare.com/rome/"
-    }
-   ],
    "scene": {
     "scene": "hostel",
     "tod": "night"
@@ -3294,15 +3279,9 @@ export const romeTrip: Trip = {
    "id": "pegbag",
    "due": "2026-09-28",
    "dueLabel": "Now",
-   "title": "Check your Pegasus bag allowance",
+   "title": "Check your airline's bag allowance",
    "asap": true,
-   "detail": "The cheapest fare allows one 40×30×15 cm bag, max 3 kg. Extra baggage is cheapest online.",
-   "links": [
-    {
-     "label": "Pegasus bundles",
-     "url": "https://www.flypgs.com/en/travel-services/flight-services/flight-packages"
-    }
-   ],
+   "detail": "Budget airlines often allow one under-seat bag of about 40×30×20 cm: check yours, and its weight limit. Extra baggage is usually cheapest online.",
    "scene": {
     "scene": "plane",
     "tod": "day"
@@ -3335,14 +3314,14 @@ export const romeTrip: Trip = {
    "due": "2026-10-07",
    "dueLabel": "By 7 Oct",
    "title": "Buy and install a travel eSIM on Wi-Fi",
-   "detail": "5 GB is plenty for four days. Keep your Turkish SIM on for bank codes, with its data roaming off.",
+   "detail": "5 GB is plenty for four days. Keep your home SIM on for bank codes, with its data roaming off.",
    "cost": "~$11–21"
   },
   {
    "id": "border",
    "due": "2026-10-01",
    "dueLabel": "1 Oct",
-   "title": "Check the news: did Italy extend the Spain → Italy border checks past 1 Oct?",
+   "title": "Check the news: any document checks on flights into Italy?",
    "detail": "ANSA or Il Post. Check the strike calendar too.",
    "links": [
     {
@@ -3400,20 +3379,14 @@ export const romeTrip: Trip = {
    "id": "pegcheck",
    "due": "2026-10-05",
    "dueLabel": "5 Oct",
-   "title": "Pegasus online check-in opens at 14:50",
-   "detail": "It opens 7 days before and closes 60 min before departure. Look at the first real weather forecast too.",
-   "links": [
-    {
-     "label": "Pegasus check-in",
-     "url": "https://www.flypgs.com/en/useful-info/info-about-flights/check-in"
-    }
-   ]
+   "title": "See when online check-in opens for your flight home",
+   "detail": "Check when your airline opens it, and set a reminder. Look at the first real weather forecast too."
   },
   {
    "id": "recheck",
    "due": "2026-10-07",
    "dueLabel": "7 Oct",
-   "title": "Re-check border news and strikes; RSVP Visionnaire; book the pub crawl",
+   "title": "Re-check the news and strikes; RSVP Visionnaire; book the pub crawl",
    "detail": "The crawl has free cancellation up to 24 h before.",
    "links": [
     {
@@ -3434,14 +3407,8 @@ export const romeTrip: Trip = {
    "id": "wizz",
    "due": "2026-10-07",
    "dueLabel": "7 Oct",
-   "title": "21:45: Wizz online check-in opens. Do it, then print the boarding pass",
-   "detail": "It closes at 18:45 on Thu 8 Oct; after that the airport desk charges €40–50.",
-   "links": [
-    {
-     "label": "Wizz check-in",
-     "url": "https://www.wizzair.com/en-gb/help-centre/check-in-and-boarding/check-in/check-in-process"
-    }
-   ],
+   "title": "Online check-in for your flight: do it, then save or print the boarding pass",
+   "detail": "Check when it closes: some budget airlines close it 2 to 3 hours before departure, and checking in at the airport desk can cost €40 or more.",
    "scene": {
     "scene": "plane",
     "tod": "night"
@@ -3546,7 +3513,7 @@ export const romeTrip: Trip = {
  "packing": [
   "Passport with visa + the document folder (paper and phone)",
   "Two cards (Visa or Mastercard, not TROY-only) + €100–150 cash",
-  "Wizz boarding pass, printed",
+  "Boarding pass, printed if your airline asks for paper",
   "Travel insurance details and its 24/7 number",
   "Photos of passport and visa in the cloud + one paper copy",
   "eSIM installed and tested",
@@ -5428,7 +5395,7 @@ export const romeTrip: Trip = {
    "blocks": [
     {
      "t": "p",
-     "text": "Your base is YellowSquare, voted Best Hostel in Italy at Hostelworld's 2026 awards, with a party or concert every night. Here is everything else."
+     "text": "Your base is a social hostel: many in Rome run a party, a pub crawl or live music most nights. Here is everything else."
     },
     {
      "t": "p",
@@ -5562,7 +5529,7 @@ export const romeTrip: Trip = {
     {
      "t": "list",
      "items": [
-      "**Hostel events:** YellowSquare's nightly party and free strolls. Sit at the bar and say hi.",
+      "**Hostel events:** social hostels often run a nightly party, free walks or a pub crawl. Sit at the bar and say hi.",
       "**Hostelworld City Chat + Linkups:** open from 14 days before arrival. Post “Anyone for the Vatican at 8 on Friday?” · [Linkups](https://www.hostelworld.com/linkups)",
       "**Food tour:** Eating Europe's Twilight Trastevere (€94, max 12) is dinner plus a ready-made group.",
       "**Tablo:** an Italian app to join strangers at a restaurant table, for friends rather than dating.",
@@ -5585,7 +5552,7 @@ export const romeTrip: Trip = {
     {
      "t": "callout",
      "title": "Profile bio you can copy",
-     "text": "Visiting Rome 8–12 Oct from Türkiye. Looking for aperitivo and someone to show me their Rome.",
+     "text": "Visiting Rome for a few days, 8–12 Oct. Looking for aperitivo and someone to show me their Rome.",
      "tone": "gold"
     },
     {
@@ -5659,7 +5626,7 @@ export const romeTrip: Trip = {
     {
      "t": "callout",
      "title": "Getting home",
-     "text": "Metro until about 01:30 on Fri and Sat; then night buses nMA/nMB (30–40+ min apart) or an official taxi via FreeNow or 060609 (night start €7.50; centre–Testaccio about €15–20). Never an unmarked car. Agree a meeting point, keep your phone charged, and save “YellowSquare, Via Palestro 51”.",
+     "text": "Metro until about 01:30 on Fri and Sat; then night buses nMA/nMB (30–40+ min apart) or an official taxi via FreeNow or 060609 (night start €7.50; centre–Testaccio about €15–20). Never an unmarked car. Agree a meeting point, keep your phone charged, and save the name and address of where you stay.",
      "tone": "gold"
     },
     {
@@ -5966,7 +5933,7 @@ export const romeTrip: Trip = {
       ],
       [
        "**ENTRIES**",
-       "1, 2 or MULT. Barcelona → Rome is inside Schengen, so it doesn't use an entry."
+       "1, 2 or MULT. A flight from another Schengen country stays inside Schengen, so it doesn't use an entry."
       ],
       [
        "**DURATION OF VISIT**",
@@ -5988,7 +5955,7 @@ export const romeTrip: Trip = {
     {
      "t": "callout",
      "title": "Police-check folder (paper + phone)",
-     "text": "Passport with visa · hostel booking · Pegasus e-ticket for 12 Oct · travel insurance · cards plus some cash. Since 1 Aug 2026 Italy has run targeted checks on non-EU travellers arriving from Spain, renewed in 15-day blocks; the last confirmed period ends 1 Oct. People without documents are the ones refused.",
+     "text": "Passport with visa · hostel booking · your ticket home · travel insurance · cards plus some cash. Italy can run document checks on flights from other Schengen countries, so carry your passport. People without documents are the ones refused.",
      "tone": "accent"
     }
    ]
@@ -6012,7 +5979,7 @@ export const romeTrip: Trip = {
       "**Always pay in EUR, never TRY.** If a machine offers to charge you in TRY, refuse: that's dynamic currency conversion, with markups up to 18%.",
       "**Avoid Euronet and stand-alone “tourist” ATMs** (high fees, bad rates). Use an ATM at a real bank branch.",
       "**Bring €100–150 in cash** from home. Carry €50–100 and lock the rest away.",
-      "**Wise and Revolut aren't available to Türkiye residents.** Ask your bank about its foreign-transaction fee."
+      "**Wise and Revolut aren't available to residents of every country** (Türkiye, for one). Ask your bank about its foreign-transaction fee."
      ]
     }
    ]
@@ -6025,7 +5992,7 @@ export const romeTrip: Trip = {
    "blocks": [
     {
      "t": "p",
-     "text": "Install a travel eSIM at home on Wi-Fi (the phone must be unlocked and eSIM-capable). Keep your Turkish SIM on for bank SMS codes, with its data roaming off. 5 GB is plenty for four days; Italian tourist SIMs (~€25 for 200 GB) are overkill."
+     "text": "Install a travel eSIM at home on Wi-Fi (the phone must be unlocked and eSIM-capable). Keep your home SIM on for bank SMS codes, with its data roaming off. 5 GB is plenty for four days; Italian tourist SIMs (~€25 for 200 GB) are overkill."
     },
     {
      "t": "table",
@@ -6075,8 +6042,7 @@ export const romeTrip: Trip = {
       "Hostelworld",
       "Resident Advisor",
       "Musei Italiani (Pantheon)",
-      "Wizz Air",
-      "Pegasus",
+      "Your airline's app",
       "Tinder / Hinge / Bumble",
       "Waidy WOW (water fountains)"
      ]
@@ -6097,12 +6063,8 @@ export const romeTrip: Trip = {
      ],
      "rows": [
       [
-       "Wizz Air free under-seat bag",
-       "40×30×20 cm, max 10 kg"
-      ],
-      [
-       "Pegasus cheapest fare (Light)",
-       "**40×30×15 cm, max 3 kg**, nothing else"
+       "Budget airline, free under-seat bag",
+       "often about 40×30×20 cm: check yours, and its weight limit"
       ],
       [
        "Colosseum",
@@ -6116,7 +6078,7 @@ export const romeTrip: Trip = {
     },
     {
      "t": "p",
-     "text": "One soft backpack of about 40×30×15 cm passes Wizz, Pegasus Light and the Colosseum. On a Light fare, wear your heaviest clothes on the plane or buy extra baggage online."
+     "text": "One soft backpack of about 40×30×15 cm fits most budget airlines' under-seat limits and the Colosseum's. If your fare has a low weight limit, wear your heaviest clothes on the plane or buy extra baggage online."
     },
     {
      "t": "special",
@@ -6337,26 +6299,26 @@ export const romeTrip: Trip = {
   {
    "id": "depart",
    "title": "Departure day, Mon 12 Oct",
-   "subtitle": "Termini 11:05 → Terminal 3 → Pegasus 14:50",
+   "subtitle": "Termini 11:05 → Fiumicino → your flight home 14:50",
    "icon": "plane",
    "blocks": [
     {
      "t": "list",
      "ordered": true,
      "items": [
-      "**Night before:** Pegasus online check-in (opens Mon 5 Oct 14:50, closes 60 min before). Check your bag fits your fare: the cheapest allows one 40×30×15 cm bag, 3 kg; oversized bags are charged at boarding.",
+      "**Night before:** online check-in for your flight home, if you haven't done it yet. Check your bag fits your fare: budget airlines charge for oversized bags at boarding.",
       "**10:45, Termini platforms 23–24:** €14 ticket, validate, 11:05 train (arrives 11:37). By taxi (€55) leave around 10:45; the SIT bus from Via Marsala 5 (10:10, 10:30, 10:50) takes 50–70 min.",
-      "**~11:50, Terminal 3** (5–10 min walk from the station). Pegasus flies from T3 to Istanbul Sabiha Gökçen daily.",
-      "**Pegasus counter** for bag drop or a document check; it closes at 13:50.",
+      "**~11:50, your terminal** (5–10 min walk from the station). Check which one your flight leaves from.",
+      "**Airline desk** for bag drop or a document check. Check-in and bag drop close (usually 60 minutes before): about 13:50.",
       "**Security.**",
-      "**Passport control / EES exit:** your passport is scanned and your face and/or fingerprints checked against your entry record. No stamp. The officer may check you stayed within your visa's days and dates.",
-      "**E gates** (non-Schengen): at the gate by 14:10; it closes 14:30.",
-      "**14:50:** take off. Latest safe arrival at T3: about 12:20."
+      "**Passport control / EES exit** (flying out of the Schengen area): your passport is scanned and your face and/or fingerprints checked against your entry record. No stamp. The officer may check you stayed within your visa's days and dates.",
+      "**At the gate by 14:10;** it closes 14:30.",
+      "**14:50:** take off. Latest safe arrival at the airport: about 12:20."
      ]
     },
     {
      "t": "p",
-     "text": "If you're a Turkish citizen flying home, nothing extra is needed to enter Türkiye: the only formality today is the Schengen exit check."
+     "text": "Check what your destination needs for entry before you fly. At this end, flying out of the Schengen area, the only formality is the exit check."
     }
    ]
   },
@@ -6378,10 +6340,10 @@ export const romeTrip: Trip = {
      "t": "list",
      "ordered": false,
      "items": [
-      "**Full days average ≈€150**, which fits “€120+, do as much as possible”: crawl, club, rooftop and a famous trattoria included.",
+      "**Full days average ≈€150** when you do as much as possible: crawl, club, rooftop and a famous trattoria included.",
       "**Saver version ≈€103/day:** hostel party instead of the crawl, street-food dinner, €5 spritz instead of a rooftop, walk instead of taxis.",
       "**Add-ons:** Castel Sant'Angelo +€18; Colosseum Full Experience +€6; Borghese up to +€5 if the price turns out to be €18; Eating Europe tour €94 instead of the Saturday dinner and bars.",
-      "**Hostel (separate):** 4 nights × ~€35–70 + €14 tax = €154–294 (≈8,590–16,400 TL). All-in on the ground: ~€657–797 (≈36,700–44,500 TL), plus the eSIM and any Pegasus bag upgrade."
+      "**Hostel (separate):** 4 nights × ~€35–70 + €14 tax = €154–294 (≈8,590–16,400 TL). All-in on the ground: ~€657–797 (≈36,700–44,500 TL), plus the eSIM and any extra baggage."
      ]
     },
     {
@@ -6416,12 +6378,9 @@ export const romeTrip: Trip = {
      "t": "list",
      "ordered": false,
      "items": [
-      "[Wizz Air: check-in process](https://www.wizzair.com/en-gb/help-centre/check-in-and-boarding/check-in/check-in-process)",
-      "[Pegasus: check-in](https://www.flypgs.com/en/useful-info/info-about-flights/check-in) · [bundles](https://www.flypgs.com/en/travel-services/flight-services/flight-packages)",
       "[Trenitalia: Leonardo Express timetable](https://www.trenitalia.com/content/dam/trenitalia/allegati/info/orario-digitale/collegamenti/orari-leonardo-express.pdf)",
       "[SIT Bus Shuttle: Fiumicino to Rome](https://www.sitbusshuttle.com/fermate-e-orari/orari-fiumicino-roma/)",
       "[Roma Mobilità: official taxi fares](https://romamobilita.it/muoversi-a-roma/taxi/)",
-      "[Euronews: checks on arrivals from Spain](https://www.euronews.com/my-europe/2026/07/31/italy-suspends-schengen-with-spain-over-ceuta-migrant-crisis-shuts-air-and-sea-borders)",
       "[European Commission: Entry/Exit System](https://home-affairs.ec.europa.eu/news/entry-exit-system-fully-operational-10-april-2026-who-exempt-2026-07-27_en)",
       "[Ministry of Transport: strike calendar](https://scioperi.mit.gov.it/mit2/public/scioperi)",
       "[D.Lgs. 286/1998, art. 6](https://www.brocardi.it/testo-unico-immigrazione/titolo-ii/capo-i/art6.html)",
@@ -6440,12 +6399,10 @@ export const romeTrip: Trip = {
       "[Pantheon](https://direzionemuseiroma.cultura.gov.it/en/pantheon/)",
       "[Trevi Fountain: official site](https://fontanaditrevi.roma.it/en)",
       "[VIVE / Vittoriano](https://vive.cultura.gov.it/en/info-and-timetables-1)",
-      "[YellowSquare FAQ](https://yellowsquare.com/faqs/) · [HOSCARs 2026](https://global.hostelworld.com/hoscars)",
       "[Resident Advisor: Rome, week of 8 Oct](https://ra.co/events/it/rome?week=2026-10-08)",
       "[The Infatuation: classic Rome restaurants](https://www.theinfatuation.com/rome/guides/classic-rome-restaurants-worth-the-hype)",
       "[Katie Parla: where to eat in Rome](https://katieparla.com/where-to-eat-drink-shop-rome/)",
-      "[UK FCDO: Italy safety](https://www.gov.uk/foreign-travel-advice/italy/safety-and-security)",
-      "[Turkish Embassy in Rome](https://roma-be.mfa.gov.tr/Mission/Contact)"
+      "[UK FCDO: Italy safety](https://www.gov.uk/foreign-travel-advice/italy/safety-and-security)"
      ]
     }
    ]
@@ -6464,19 +6421,9 @@ export const romeTrip: Trip = {
    "tel": "116117"
   },
   {
-   "label": "Turkish Embassy (if you're a Turkish citizen) · Via Palestro 28, same street as YellowSquare · Mon–Fri 09:00–13:00, 14:00–18:00",
-   "value": "+39 06 445 941",
-   "tel": "+3906445941"
-  },
-  {
-   "label": "Embassy emergency, after hours",
-   "value": "+39 340 1766431",
-   "tel": "+393401766431"
-  },
-  {
-   "label": "Turkish 24/7 Consular Call Centre",
-   "value": "+90 312 292 29 29",
-   "tel": "+903122922929"
+   "label": "Your embassy or consulate in Rome",
+   "value": "Before you go, save its address, opening hours and 24/7 emergency number.",
+   "text": true
   },
   {
    "label": "Official taxi · Bill fraud (Guardia di Finanza)",
@@ -6497,15 +6444,15 @@ export const romeTrip: Trip = {
  "sosSteps": [
   "In danger, call 112. Block your cards.",
   "File a report at a Polizia di Stato or Carabinieri station (“denuncia di smarrimento” for loss, “di furto” for theft) and get a stamped copy.",
-  "Call the Turkish Embassy and ask for an urgent consular appointment.",
-  "Apply for an emergency travel document (“Pasaport Yerine Geçen Belge”); it usually needs the police report, a photo and ID details.",
-  "A police report alone won't get you out of Italy. Tell Pegasus, and go to the airport early."
+  "Call your embassy or consulate and ask for an urgent consular appointment.",
+  "Apply for an emergency travel document; it usually needs the police report, a photo and ID details.",
+  "A police report alone won't get you out of Italy. Tell your airline, and go to the airport early."
  ],
  "driverCard": [
   "Per favore, mi porti a:",
-  "YellowSquare Rome",
-  "Via Palestro 51",
-  "00185 Roma",
+  "Metro Castro Pretorio",
+  "Viale Castro Pretorio, 00185 Roma",
+  "(il mio ostello è lì vicino)",
   "Tariffa fissa? Grazie!"
  ],
  "phrases": [
@@ -6605,6 +6552,78 @@ export const romeTrip: Trip = {
    "I lost my passport"
   ]
  ],
+ "meetPhrases": [
+  [
+   "Ciao! Piacere, sono…",
+   "chow! pyah-CHEH-reh, SOH-noh",
+   "Hi, nice to meet you, I'm…"
+  ],
+  [
+   "Sei di Roma?",
+   "say dee ROH-mah",
+   "Are you from Rome?"
+  ],
+  [
+   "È la mia prima volta a Roma.",
+   "eh lah MEE-ah PREE-mah VOHL-tah ah ROH-mah",
+   "It's my first time in Rome."
+  ],
+  [
+   "Cosa mi consigli?",
+   "KOH-zah mee kohn-SEEL-yee",
+   "What do you recommend?"
+  ],
+  [
+   "Dove vai stasera?",
+   "DOH-veh vy stah-SEH-rah",
+   "Where are you going tonight?"
+  ],
+  [
+   "Vieni con noi?",
+   "VYEH-nee kohn noy",
+   "Do you want to come with us?"
+  ],
+  [
+   "Mi insegni una parola in romanesco?",
+   "mee een-SEN-yee OO-nah pah-ROH-lah een roh-mah-NES-koh",
+   "Will you teach me a word of Roman dialect?"
+  ],
+  [
+   "Ti va un aperitivo domani?",
+   "tee vah oon ah-peh-ree-TEE-voh doh-MAH-nee",
+   "Fancy an aperitivo tomorrow?"
+  ],
+  [
+   "Sei su Instagram?",
+   "say soo EEN-stah-grahm",
+   "Are you on Instagram?"
+  ],
+  [
+   "Sei simpatica.",
+   "say seem-PAH-tee-kah",
+   "You're fun (to a woman)."
+  ],
+  [
+   "Sei simpatico.",
+   "say seem-PAH-tee-koh",
+   "You're fun (to a man)."
+  ],
+  [
+   "Daje!",
+   "DAH-yeh",
+   "Come on! Great! (Roman slang)"
+  ],
+  [
+   "No, grazie.",
+   "noh GRAH-tsee-eh",
+   "No, thanks."
+  ],
+  [
+   "È stato un piacere. Ci vediamo!",
+   "eh STAH-toh oon pyah-CHEH-reh. chee veh-DYAH-moh",
+   "It was a pleasure. See you!"
+  ]
+ ],
  "budget": [
   {
    "dayId": "thu",
@@ -6619,7 +6638,7 @@ export const romeTrip: Trip = {
     "",
     "",
     "",
-    "Aerobús + airport bus (~€9)"
+    "Bus or train to your airport + the SIT bus (~€9)"
    ]
   },
   {
@@ -6845,7 +6864,7 @@ export const romeTrip: Trip = {
    "num": "VIII",
    "day": "Thu · arrival",
    "title": "Hostel bar, if you're still up",
-   "text": "You land near midnight. YellowSquare's bar is the easy first hello.",
+   "text": "You land near midnight. Your hostel's bar, if it has one, is the easy first hello.",
    "scene": "hostel",
    "dayId": "thu"
   },
@@ -6872,6 +6891,153 @@ export const romeTrip: Trip = {
    "text": "Hostel party, Alessandro Palace beer pong (20:00–23:00), a ghost walk at 20:00, or Max Richter at Teatro Argentina. Early night: you fly Monday.",
    "scene": "theatre",
    "dayId": "sun"
+  }
+ ],
+ "meet": [
+  {
+   "id": "hostel-events",
+   "kind": "event",
+   "icon": "bed",
+   "title": "Your hostel's events",
+   "text": "Social hostels often run a party, a pub crawl, free walks or live music most nights. Sit at the bar and say hi: it's the easiest start.",
+   "when": "Most nights",
+   "ask": "Anyone up for the hostel bar tonight?"
+  },
+  {
+   "id": "walk-rome-central",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Free walking tour: Rome Central",
+   "text": "**Best Euro Tours** meets at Piazza di S. Marco 48, by Piazza Venezia: look for the green “CITY WALKING TOUR” sign. Free, tip €10–20; rated 4.99/5 from 6,793 reviews.",
+   "when": "Daily at 10:00 and 11:00, and more",
+   "link": {
+    "label": "GuruWalk calendar",
+    "url": "https://www.guruwalk.com/rome"
+   },
+   "ask": "Anyone for the free walking tour from Piazza Venezia at 10:00?"
+  },
+  {
+   "id": "walk-what-about-tours",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Free walking tour: What About Tours",
+   "text": "The city centre tour meets on the church steps near Trajan's Column, Foro Traiano 89. Their Colosseum, Ghetto and Trastevere tours meet where you book. Free: tip what it was worth.",
+   "when": "City centre at 11:00 and 17:00",
+   "link": {
+    "label": "Freetour.com",
+    "url": "https://www.freetour.com/rome"
+   },
+   "ask": "Anyone for the 17:00 free walking tour from Trajan's Column?"
+  },
+  {
+   "id": "crawl-ultimate-party",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Rome's Ultimate Party pub crawl",
+   "text": "Meets at **The Highlander Pub**, Vicolo di S. Biagio 9, near the Spanish Steps. About US$40 with one drink, or US$56 with an hour of open bar; pizza, shots and club entry included; 18+. Book online.",
+   "when": "Fri 9 Oct, 21:30 (it runs nightly)",
+   "dayId": "fri",
+   "link": {
+    "label": "Viator",
+    "url": "https://www.viator.com/tours/Rome/Romes-Ultimate-Party-aka-the-Spanish-Steps-Pub-Crawl/d511-348679P2"
+   },
+   "ask": "Anyone for the pub crawl tonight? We meet at The Highlander Pub at 21:30."
+  },
+  {
+   "id": "crawl-italian",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Italian Pub Crawls",
+   "text": "A calmer crawl: three bars from the Giordano Bruno statue in Campo de' Fiori. Drinks aren't included, and the club is €10 more.",
+   "when": "Evenings: nights aren't published, so check the site",
+   "link": {
+    "label": "Website",
+    "url": "https://italianpubcrawls.com/rome-pub-crawl/"
+   },
+   "ask": "Anyone for the pub crawl from Campo de' Fiori tonight?"
+  },
+  {
+   "id": "food-twilight-trastevere",
+   "kind": "tour",
+   "icon": "food",
+   "title": "Twilight Trastevere food tour",
+   "text": "**Eating Europe**'s evening tour, about 4 hours with at most 12 people: dinner plus a ready-made group for the bars afterwards. €94; free cancellation up to 24 h before.",
+   "when": "Sat 10 Oct, evening",
+   "dayId": "sat",
+   "link": {
+    "label": "Eating Europe",
+    "url": "https://www.eatingeurope.com/rome/"
+   },
+   "ask": "Anyone on the Twilight Trastevere food tour on Saturday? Bars after?"
+  },
+  {
+   "id": "app-tablo",
+   "kind": "app",
+   "icon": "food",
+   "title": "Tablo",
+   "text": "An Italian app for joining strangers at a restaurant table: for making friends rather than dating.",
+   "when": "Any lunch or dinner",
+   "ask": "Anyone fancy sharing a table for dinner tonight?"
+  },
+  {
+   "id": "language-exchange",
+   "kind": "event",
+   "icon": "chat",
+   "title": "Language exchanges",
+   "text": "Most fall Monday to Wednesday. **Pignetismi** in Pigneto listed a Thursday speaking club and a Sunday social breakfast earlier in the year: check Eventbrite a week before.",
+   "when": "Mostly Mon to Wed: check the week before",
+   "ask": "Anyone going to a language exchange this week?"
+  },
+  {
+   "id": "app-hostelworld",
+   "kind": "app",
+   "icon": "chat",
+   "title": "Hostelworld City Chat and Linkups",
+   "text": "Rome's City Chat opens 14 days before you arrive. Post a plan in Linkups and see who joins.",
+   "when": "From 14 days before you arrive",
+   "link": {
+    "label": "Linkups",
+    "url": "https://www.hostelworld.com/linkups"
+   },
+   "ask": "Anyone for the Vatican at 8 on Friday?"
+  },
+  {
+   "id": "bar-san-calisto",
+   "kind": "place",
+   "icon": "glass",
+   "title": "Aperitivo at Bar San Calisto",
+   "text": "Trastevere's busy, cheap bar: €3 Peroni and €5 spritz, open to 02:00. Go for aperitivo any evening, or start Saturday's Trastevere night here, then the Piazza Trilussa fountain steps.",
+   "when": "Sat 10 Oct from 23:00 (aperitivo from 19:00 any night)",
+   "dayId": "sat",
+   "ask": "Anyone for a drink at Bar San Calisto in Trastevere at 23:00 on Saturday?"
+  },
+  {
+   "id": "sun-beer-pong",
+   "kind": "event",
+   "icon": "glass",
+   "title": "Sunday beer pong at Alessandro Palace",
+   "text": "This hostel bar at Via Vicenza 42 runs beer pong and happy hour on Sundays, when the clubs are quiet.",
+   "when": "Sun 11 Oct, 20:00 to 23:00",
+   "dayId": "sun",
+   "link": {
+    "label": "Website",
+    "url": "https://alessandropalace.com/en/home-alessandro-palace/"
+   },
+   "ask": "Anyone for beer pong at Alessandro Palace at 20:00 on Sunday?"
+  },
+  {
+   "id": "sun-ghost-walk",
+   "kind": "tour",
+   "icon": "walk",
+   "title": "Ghost walk with What About Tours",
+   "text": "A free evening tour: tip what it was worth. Check that it runs on Sunday.",
+   "when": "Sun 11 Oct, 20:00",
+   "dayId": "sun",
+   "link": {
+    "label": "Freetour.com",
+    "url": "https://www.freetour.com/rome"
+   },
+   "ask": "Anyone for the ghost walk at 20:00 on Sunday?"
   }
  ],
  "createdAt": "2026-09-29T00:00:00.000Z",

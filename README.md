@@ -1,8 +1,8 @@
 # Travels
 
-A trip companion that tells you **what to do right now**, follows you on the map, and keeps track of **what you planned, what you did and what's left**, across all your trips.
+A trip companion that tells you **what to do right now**, follows you on the map, and keeps track of **what you planned, what you did and what's left**, across all your trips. Plan trips **together** with friends, share moments and plans, meet people on the way, and re-plan in a minute when things go wrong.
 
-Open **https://travela-emre.firebaseapp.com**, sign in with Google, and plan your own trips or try the sample: a full 5-day plan for **Rome, 8–12 October 2026** (first trip abroad, solo, social hostel).
+Open **https://travela-emre.firebaseapp.com**, sign in with Google, and plan your own trips or try the sample: a full 5-day plan for **Rome, 8–12 October 2026** (solo, social hostel).
 
 <p>
   <img src="docs/screenshots/now.webp" width="240" alt="The Now screen: today's money, the stop you should be at, time left, and when to leave for the next one">
@@ -53,7 +53,26 @@ A trip has five tabs, the same five as top tabs on a laptop: **Now**, **Plan**, 
 - *Get ready*: bookings with due dates and tick-offs, and a packing list. *Find your way*: the full map (days, places and the metro), the guide (money with a converter, phone, safety, getting around, departure day, useful Italian you can listen to) and Notes & chats. *Help and settings*: an SOS screen with tap-to-call numbers and a card to show a taxi driver, and trip settings.
 - On a stop: rate it, tag it (Loved it, Hidden gem, Too crowded…), write a note, add photos, and see its costs and stamps.
 
-**All your trips** on one home screen, with progress bars for the plan and for your preparation.
+**Together**: plan with friends, share plans, meet people (Google sign-in and a connection)
+- **Group trips.** Invite people to a trip by link or QR code, as **Can edit** or **Can view**. Everyone sees one shared plan; changes made at the same time on two phones are merged stop by stop. Your ticks, ratings, notes, photos, costs and stamps stay yours.
+- **The Together page** (the faces in the trip's header): a group **chat** (text, photos, a stop, where you are), **People** with everyone's status ("At Pantheon", "Running late", "Home safe") and roles, and **Decide**: votes on the plan's options still ahead (picking an option is your vote; an editor makes the leader the group's pick; past ones fold under *Earlier*) and who's in for the next stops. On Now, a line of where everyone is; late at night, **I'm home safe**.
+- **Friends and a feed.** Add friends with your link or QR code, by @handle, or from a group trip. Post moments from a stop or a day (text and a photo), like and comment; nothing is posted by itself, and posts are for friends only. **Let friends see where I'm going** (off until you turn it on) shows them your trips' places and dates, and the app shows friends travelling now or in the same city on your dates.
+- **Meet people** (More, or a stop): tonight's options, **Say hi**, ways to meet people (the sample has a dozen), friends in town, and **meetups**: an open invite for a time and a place ("Anyone for the Vatican at 8 on Friday?") as a link anyone can open, in any chat; saying "I'm in" needs an account. Keep a list of the **people you met** and send them your friend link. A row at the top jumps to each part.
+- **Say hi**: lines to start a chat (where you're staying, at the bar, a group, anywhere), keep it going and wrap up kindly (with consent and safety), invites made from your plan's next stops ("Pub crawl, tonight at 21:30. Want to come with me?") that become a meetup link in a tap, your friend QR code to swap on the spot, and the trip's phrases in the local language, read aloud. During the trip, a goal: say hi to five people today (counted with + and −).
+- **Share this plan**: invite people to plan it together or to follow along, or make a **plan link**: a read-only copy anyone can open (where you stay left out unless you tick it) and copy to their own trips on their own dates.
+- **Activity** (the bell): friend requests, invites, likes, comments, people joining your trip or your meetup.
+
+<p>
+  <img src="docs/screenshots/together.webp" width="240" alt="Together: a group trip's chat, with a stop sent as a card and everyone's faces in the header">
+  <img src="docs/screenshots/sayhi.webp" width="240" alt="Meet people, Say hi: today's goal of saying hi to five people, three rules, and lines to start a chat">
+  <img src="docs/screenshots/friends.webp" width="240" alt="Friends: the feed of trip moments from friends, with likes and comments">
+</p>
+
+**When plans change** (works offline)
+- **Plans changed** (Now, Plan, More): running late (shift the rest of today, booked stops stay put), starting later (skip what's gone, move the must-dos to a day they're open), a cancelled or delayed flight (what to ask for at the desk and what not to accept in a hurry, receipts, a message for where you stay, re-plan tomorrow), or taking the rest of the day off. Undo for each; a group trip's chat says what changed.
+- **Claims** (More): money back for a cancelled or delayed flight (EU261 amounts by distance), a lost bag or a booking: amounts and how likely each is, costs linked from the Costs page, steps with due dates, and the deadline on Home from 60 days out.
+
+**All your trips** on one home screen, with progress bars for the plan and for your preparation, and a Friends section. **New trip** asks who's coming: with friends, the trip opens on Together with **Invite people**, so the planning starts together.
 
 **Notes & chats**: research, tips and chat logs saved from conversations with Claude, readable in the app (home screen, `/notes`, and each trip's *More* tab). They're Markdown files in [`content/notes`](content/notes).
 
@@ -76,6 +95,7 @@ A trip has five tabs, the same five as top tabs on a laptop: **Now**, **Plan**, 
 - **One address, with a front page.** The app lives at https://travela-emre.firebaseapp.com (`travela-emre.web.app` forwards there). A device with no account sees a landing page: what the app does, feature by feature, and **Sign in with Google**. Every other page needs an account.
 - **Any Google account, each one private.** Anyone can sign in with Google, and each account reads and writes only its own data: the security rules (`firebase/`) refuse everything else. On a phone or from the Home Screen, sign-in goes to Google's page and comes back; in a desktop browser it opens a small window (or goes to Google's page when the window is blocked).
 - **Saved to your account, kept on the device.** Trips and progress (ticks, ratings, notes, costs, stamps, bookings, packing, day notes and choices) are saved in Firestore, photos in Cloud Storage. Each device keeps a copy (`localStorage`, photos in IndexedDB), so the app opens and works offline. Every device you sign in on stays in step; changes made offline sync when you're back online, and edits made on two devices are merged (ticks, ratings, notes and photos from both are kept, and costs and stamps are merged one by one, a deleted cost staying deleted). Only each device's own settings stay on it alone, such as the look, the map choice, alerts and which celebrations it already showed.
+- **Friends and group trips are shared on purpose, and only as far as you say.** Your profile (name, photo, @handle, bio, home city) is visible to signed-in people; your trips' places and dates to friends, only once you turn on *Let friends see where I'm going*; posts to your friends only; a group trip's plan, chat, votes and statuses to its members; meetups and plan links to whoever has their link (who's going only to signed-in people). Your progress (ticks, ratings, notes, photos, costs, stamps, claims, people you met) is never shared. The rules in `firebase/firestore.rules` enforce each of these, and are checked on the emulators.
 - **Nothing is added for you.** A new account starts empty, with **Plan a trip** and **Try the sample trip** (a copy of the Rome plan that keeps following the version in this repository).
 - **A device belongs to one account.** It remembers who signed in and opens straight into their trips, offline too. If the session has lapsed, the app keeps working and asks to *Sign in again to keep saving to your account*. **Sign out** returns to the front page and keeps the device's copy for when the same account signs back in; when changes haven't reached the account yet, it warns first. **Sign out and remove from this device** clears the copy. Signing in with a different account clears the device's copy first, then brings that account's own data; a device used before accounts existed brings its trips and progress into the first account that signs in on it.
 - **Google Maps**: the map uses Google's tiles (Map Tiles API) and the live guide asks Google (Routes API) for real walking and transit times, including which metro or bus to catch for "leave by". Offline, the guide falls back to its own estimates and the map to OpenStreetMap, showing the areas you looked at with OpenStreetMap on (the service worker keeps the tiles you viewed, never more, per the OpenStreetMap tile policy). To have the map offline, choose OpenStreetMap in *Settings → Map* before the trip and look around the areas you'll visit.
@@ -112,6 +132,17 @@ node tests/e2e/landing.e2e.mjs   # the landing page, sign-in required, the empty
 node tests/e2e/ui.e2e.mjs        # across screens: lit tabs, sideways scroll, touch targets, contrast, offline map
 node tests/e2e/ui.e2e.mjs --build              # serves .output/public itself
 SHOTS=1 node tests/e2e/ui.e2e.mjs --build      # writes docs/screenshots/*.webp (needs cwebp)
+node tests/e2e/changes.e2e.mjs   # Plans changed and claims
+```
+
+The social layer's screens are checked on a build whose "cloud" lives in the browser (the memory backend, with hooks to
+act as other people: `tests/e2e/social-lib.mjs`):
+
+```bash
+NUXT_PUBLIC_SOCIAL_BACKEND=memory npm run generate
+node tests/e2e/group.e2e.mjs --build     # group trips: invites, joining, chat, votes, who's in, statuses, viewers
+node tests/e2e/friends.e2e.mjs --build   # friends, links, the feed, posts, likes, comments, Activity, Home
+node tests/e2e/meet.e2e.mjs --build      # Meet people, meetups, plan links, people you met
 ```
 
 `tests/e2e/lib.mjs` holds their shared helpers (a phone that remembers a made-up account, or has none with `signedOut: true`; the seeded test state; a frozen clock; a static server for the build); run on its own it is a smoke test of every trip page, and checks that a device with no account stays on the landing page.
@@ -122,15 +153,20 @@ Stack: Nuxt 4 (client-side SPA, static generation), Vue 3, VueUse, Leaflet with 
 
 ```
 app/
-  pages/            index (the landing page, or all trips once signed in), trips/new, settings,
-                    trips/[id]/{now,plan,places,costs,more,map,progress,badges,bookings,packing,guide,notes,sos,settings}
+  pages/            index (the landing page, or all trips once signed in), trips/new, settings, friends,
+                    trips/[id]/{now,plan,places,costs,more,map,progress,badges,bookings,packing,guide,notes,sos,settings,
+                    group,meet,claims}; links anyone can open: f/[token] (add a friend), j/[token] (join a trip),
+                    m/[id] (a meetup), p/[id] (a plan link)
   middleware/       auth.global.ts: every page but the landing page needs an account
   components/       LandingPage, AccountCard, MapView (Leaflet), StopSheet, StopEditor, FeedbackEditor, CostPad,
                     CostSheet, PlaceTile, PlaceSheet, StampMark, BadgeSeal, RankCard, GameHost (celebrations),
                     HomeCard, DayStrip, …
   composables/      useTrips, useProgress, useTripView, useTripActions (ticks, costs, stamps), useGame,
                     useClock, useGeo, useLiveAlerts, usePhotos, useCloud (sign-in, the device's account, sync),
-                    useGoogleMaps (tiles and routes), …
+                    useGoogleMaps (tiles and routes), useSocial (friends, profile, activity, the feed),
+                    useGroups (group trips: the shared plan kept in step and merged), useTripGroup, usePostComposer, …
+  lib/social/       api.ts (the social backend's contract), firestore.ts (Firestore and Storage), memory.ts (a stand-in
+                    kept in the browser, for browser checks)
   lib/firebase.ts   Firebase, loaded when a sign-in button shows or on a device with an account
   data/trips.ts     the trips that ship with the app (rome.ts is the Rome plan)
   data/notes.ts     loads content/notes/*.md
@@ -139,13 +175,14 @@ shared/
   types/trip.ts     the data model
   utils/            time (trip clock, time zones), geo, plan (states, progress), guide (live guide), text,
                     costs (the ledger), places (sets and stamps), game (rank and badges),
-                    sync (what to upload, download or merge), account (how sign-in opens, whose copy a device holds)
+                    sync (what to upload, download or merge), account (how sign-in opens, whose copy a device holds),
+                    social (links, votes, friends' travel, meetups, plan copies), tripmerge (two versions of a shared
+                    plan), changes (Plans changed), claims (templates, deadlines, totals)
 tests/              Vitest (including checks of every trip's data); e2e/ has the browser checks, and
-                    cloud.e2e.mjs runs against the Firebase emulators
+                    cloud.e2e.mjs and social-cloud.e2e.mjs run against the Firebase emulators
 firebase/           Firestore and Storage security rules
 scripts/            one-time Google Cloud setup
 content/notes/      notes and chat logs (Markdown)
-public/archive/     standalone pages kept as they were
 docs/               content guide and screenshots
 ```
 
@@ -159,7 +196,7 @@ Places sort themselves into sets and stops find their places by name, so a new t
 
 The app has one home, **Firebase Hosting**: https://travela-emre.firebaseapp.com (`travela-emre.web.app` forwards there). The workflow in `.github/workflows/deploy.yml` runs on every push to `main` (or by hand): unit tests, the type check and the static build, then it deploys the site with the Firestore and Storage security rules. GitHub signs in to Google without any stored key (Workload Identity Federation), and only this repository may deploy.
 
-`.github/workflows/cloud-tests.yml` runs sign-in, private accounts (two accounts can't read each other's data, and two accounts taking turns on one device never see each other's trips), two-device sync, offline merging (costs logged, edited and deleted on two devices included), photo backup and the security rules against the Firebase emulators.
+`.github/workflows/cloud-tests.yml` runs on a push to any branch (when the app, the rules or the checks change): sign-in, private accounts (two accounts can't read each other's data, and two accounts taking turns on one device never see each other's trips), two-device sync, offline merging (costs logged, edited and deleted on two devices included), photo backup and the security rules against the Firebase emulators; then the social layer with three accounts (`tests/e2e/social-cloud.e2e.mjs`): profiles and handles, friends, the feed, likes and comments, group trips edited on two phones at once, votes, who's in, statuses and chat, meetups and plan links read signed out, and over 90 checks of the security rules.
 
 **GitHub Pages is no longer deployed.** The copy already published at https://mrshn.github.io/travel-app-website/ stays online on its last version until it's unpublished, and it can't reach anyone's account under the current rules. To take it down: the repository's **Settings → Pages**, the **…** menu next to *Your site is live at*, then **Unpublish site** (or set the source to **None**). Nothing publishes it again, as no workflow deploys to Pages any more. Anything logged only on that copy can come across as a file: its *Settings → Export everything*, then *Import a backup* at the new address.
 

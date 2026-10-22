@@ -24,10 +24,10 @@ const flat = s => String(s ?? '').replace(/\s+/g, ' ').trim()
 const EM_DASH = String.fromCharCode(0x2014)
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-/** The seven jobs of the landing page's feature cards, in order (spec D38). */
+/** The jobs of the landing page's feature cards, in order (spec D38, and Together of docs/design/2026-10-14-together.md). */
 const FEATURES = [
   ['now', 'Now'], ['plan', 'Plan'], ['places', 'Places'], ['costs', 'Costs'], ['badges', 'Badges and ranks'],
-  ['offline', 'Offline and on every device'], ['private', 'Private'],
+  ['together', 'Together'], ['offline', 'Offline and on every device'], ['private', 'Private'],
 ]
 
 /**
@@ -52,7 +52,7 @@ async function device(opts = {}) {
   return d
 }
 
-/** A full load of an app path ("", "settings", "trips/rome-2026-10/now"). */
+/** A full load of an app path ("", "settings", "trips/rome-sample/now"). */
 async function open(page, path = '') {
   await page.goto(`${BASE}${path.replace(/^\//, '')}`, { waitUntil: 'domcontentloaded' })
   await ready(page)
@@ -216,7 +216,7 @@ try {
     await ctxClose(d)
   }
   {
-    // D43: the notes (the Rome research and planning chat among them) load only for the signed-in home.
+    // D43: the notes load only for the signed-in home.
     const d = await device({ signedOut: true })
     const scripts = []
     d.page.on('response', (r) => {
@@ -227,7 +227,8 @@ try {
       await scrollThrough(d.page)
       const bodies = await Promise.all(scripts)
       assert(bodies.length > 3, `only ${bodies.length} scripts seen`)
-      assert(!bodies.some(b => b.includes('Conquer Rome') || b.includes('our planning chat')), 'a note came with the landing page')
+      // A heading of the how-to note (content/notes), found only in the notes' own bundle.
+      assert(!bodies.some(b => b.includes('Saving chats with Claude')), 'a note came with the landing page')
     })
     await ctxClose(d)
   }
@@ -243,7 +244,7 @@ try {
       const label = `${size.name}${dark ? ', dark' : ''}`
       const extra = size.phone ? {} : { isMobile: false, hasTouch: false, deviceScaleFactor: 1 }
       const d = await device({ signedOut: true, width: size.width, height: size.height, dark, ...extra })
-      await check(`W2 landing at ${label}: no sideways scroll, targets of 44 px, text at 4.5:1, all seven features, one sign-in button above the fold, only the app's own address asked`, async () => {
+      await check(`W2 landing at ${label}: no sideways scroll, targets of 44 px, text at 4.5:1, all eight features, one sign-in button above the fold, only the app's own address asked`, async () => {
         await open(d.page)
         await d.page.evaluate(() => document.fonts.ready)
         const fold = await d.page.evaluate(() => {
@@ -425,7 +426,7 @@ try {
     // D43: another trip's notes stay out of an account that doesn't have that trip.
     const d = await device({ trips: [] })
     const listed = async () => (await d.page.locator('.notes .ncard, .notes a').allInnerTexts()).map(flat).join(' | ')
-    await check('D43 a new account\'s home and Notes list only the notes of no trip (the how-to); the sample brings its own', async () => {
+    await check('D43 a new account\'s home and Notes list only the notes of no trip (the how-to); the sample brings no personal notes', async () => {
       await open(d.page)
       await d.page.getByRole('heading', { name: 'Notes & chats' }).waitFor()
       const home = await listed()
@@ -438,7 +439,9 @@ try {
       await until('the sample\'s Now', () => new URL(d.page.url()).pathname.endsWith(`/trips/${TRIP}/now`))
       await open(d.page)
       await d.page.getByRole('heading', { name: 'Notes & chats' }).waitFor()
-      assert(/planning chat/.test(await listed()), `with the sample, home lists: ${await listed()}`)
+      // The research and chat notes of the owner's own trip left the repository (30 Sep decision): the sample has none.
+      const withSample = await listed()
+      assert(withSample.includes('How to use the Travels app') && !/planning chat|Conquer Rome|illustrated Rome/.test(withSample), `with the sample, home lists: ${withSample}`)
       assert(!d.errors.length, d.errors.join(' / '))
     })
     await check('a note\'s Back link never leaves the app (?from=//another-site)', async () => {
@@ -448,7 +451,8 @@ try {
     })
     await ctxClose(d)
   }
-  // The home's header holds four buttons for every signed-in device: each keeps 44 x 44, and the logo stays whole.
+  // The home's header holds five buttons for every signed-in device (Notes, Theme, Friends, Account, Settings): each keeps
+  // 44 x 44, and the logo stays whole.
   for (const width of [390, 360, 320]) {
     const d = await device({ width })
     await check(`the home's header at ${width} px: the Travels link and each button at least 44 x 44, the logo whole, nothing cut`, async () => {
@@ -465,7 +469,7 @@ try {
           cut: top.scrollWidth - top.clientWidth,
         }
       })
-      assert(m.controls.length === 5, `controls: ${JSON.stringify(m.controls)}`)
+      assert(m.controls.length === 6, `controls: ${JSON.stringify(m.controls)}`)
       const small = m.controls.filter(([, w, h]) => w < 44 || h < 44)
       assert(!small.length, `under 44 px: ${JSON.stringify(small)}`)
       assert(m.logo[0] >= 29.5 && m.logo[1] >= 29.5, `the logo is ${m.logo.join(' x ')}`)

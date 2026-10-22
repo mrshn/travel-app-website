@@ -4,6 +4,22 @@ import type { TripSummary } from '#shared/utils/plan'
 import type { TripMoment } from '#shared/utils/time'
 
 const props = defineProps<{ trip: Trip, summary: TripSummary, moment: TripMoment }>()
+// A group trip shows who's in it (docs/design/2026-10-14-together.md, 5.8): you first, then the others.
+const groups = useGroups()
+const social = useSocial()
+const members = computed(() => {
+  const list = props.trip.group ? groups.membersOf(props.trip.group.id) : []
+  const me = social.me.value?.uid
+  return [...list.filter(m => m.uid === me), ...list.filter(m => m.uid !== me)]
+})
+const withLine = computed(() => {
+  const me = social.me.value?.uid
+  const others = members.value.filter(m => m.uid !== me).map(m => m.name.split(/\s+/)[0] || m.name)
+  if (!others.length) return 'Group trip'
+  if (others.length === 1) return `With ${others[0]}`
+  if (others.length === 2) return `With ${others[0]} and ${others[1]}`
+  return `With ${others[0]}, ${others[1]} and ${others.length - 2} more`
+})
 const status = computed(() => {
   const m = props.moment
   if (m.phase === 'before') return { text: m.daysToStart <= 1 ? (m.daysToStart === 1 ? 'Tomorrow' : 'Today') : `In ${m.daysToStart} days`, tone: 't-gold' }
@@ -31,6 +47,11 @@ const prep = computed(() => {
       </div>
     </div>
     <div class="body">
+      <div v-if="trip.group" class="row group">
+        <AvatarStack v-if="members.length" :people="members" :max="4" :size="26" label="Planned together" />
+        <AppIcon v-else name="users" size="sm" class="gi" />
+        <span class="small strong ellipsis">{{ withLine }}</span>
+      </div>
       <div class="row between">
         <span class="small strong">Plan</span>
         <span v-if="a.total" class="num tiny muted">{{ a.done }} done · {{ a.left }} left<template v-if="a.skipped"> · {{ a.skipped }} skipped</template></span>
@@ -68,4 +89,6 @@ const prep = computed(() => {
 .name { font-size: 22px; letter-spacing: .14em; text-transform: uppercase; line-height: 1.1; text-shadow: 0 2px 12px rgba(0, 0, 0, .4); }
 .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 .meta { gap: 6px; }
+.group { gap: 8px; }
+.gi { color: var(--accent); }
 </style>

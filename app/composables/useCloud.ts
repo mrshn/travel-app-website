@@ -5,6 +5,7 @@ import {
   accountSwitchKept, accountSwitchQuestion, accountUnsynced, syncMemoryFrom, type RememberedAccount, type SignInEnv, type SyncMemory,
 } from '#shared/utils/account'
 import { decide, itemKey, jsonHash, type CloudItem, type ItemKind } from '#shared/utils/sync'
+import { mergeTrips } from '#shared/utils/tripmerge'
 import type { Firebase, User } from '~/lib/firebase'
 import { clearPhotos, photoIds, readPhoto } from '~/lib/photoStore'
 
@@ -55,6 +56,8 @@ const jsonStore = <T>(read: (raw: string) => T | null) => ({ read, write: (v: T 
 
 /** Which celebrations this device already showed, per trip id (GameHost.vue): they go with the device's copy. */
 const CELEBRATED_KEY = 'travel:game:seen:v1'
+/** What the social layer keeps on the device for offline reading (useSocial, useGroups): it goes with the copy too. */
+const SOCIAL_PREFIXES = ['travel:social:', 'travel:groups:']
 
 /** Firebase noted, in this tab, a sign-in that went to Google's page: its return is to be picked up. */
 function signInComingBack(): boolean {
@@ -154,9 +157,15 @@ export const useCloud = createGlobalState(() => {
   const progress = useProgressStore()
   const copy = useCopyEpoch()
 
+  /**
+   * This device's trips and progress as items. Group trips are left out: their plan lives in the group's own document
+   * (useGroups); only their progress, which is yours alone, is an item.
+   */
   function localItems(): Map<string, LocalItem> {
     const m = new Map<string, LocalItem>()
-    for (const t of trips.value) m.set(itemKey('trip', t.id), { kind: 'trip', ref: t.id, json: JSON.stringify(t) })
+    for (const t of trips.value) {
+      if (!t.group) m.set(itemKey('trip', t.id), { kind: 'trip', ref: t.id, json: JSON.stringify(t) })
+    }
     for (const [id, p] of Object.entries(progress.value)) m.set(itemKey('progress', id), { kind: 'progress', ref: id, json: JSON.stringify(p) })
     return m
   }
@@ -194,6 +203,12 @@ export const useCloud = createGlobalState(() => {
     lastSynced.value = null
     try {
       localStorage.removeItem(CELEBRATED_KEY)
+      const gone: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && SOCIAL_PREFIXES.some(p => k.startsWith(p))) gone.push(k)
+      }
+      for (const k of gone) localStorage.removeItem(k)
     }
     catch { /* storage refused */ }
   }
@@ -305,12 +320,31 @@ export const useCloud = createGlobalState(() => {
     if (!s || !fresh || !online.value) return
     const m = s.m
     const locals = localItems()
+    const groupTrips = new Map(trips.value.filter(t => t.group).map(t => [t.id, t] as const))
     for (const key of new Set([...locals.keys(), ...remote.keys()])) {
       if (writing.has(key)) continue
       const l = locals.get(key)
       const r = remote.get(key)
       const kind = (l?.kind ?? r?.kind)!
       const ref = (l?.ref ?? r?.ref)!
+      // A trip that became a group trip here: its plan now lives in the group's document. Its old personal item goes
+      // (a tombstone), and changes another device made to it before it learned of the group are merged in first.
+      const grouped = kind === 'trip' ? groupTrips.get(ref) : undefined
+      if (grouped) {
+        if (!r || r.deleted) continue
+        const known = m.known[key]
+        if (!known || r.updatedAt > known.updatedAt) {
+          try {
+            const theirs = JSON.parse(r.json) as Trip
+            const i = trips.value.findIndex(t => t.id === ref)
+            if (i >= 0 && theirs.edited) trips.value[i] = mergeTrips(trips.value[i]!, { ...theirs, group: undefined })
+          }
+          catch { /* unreadable: the group's plan stays as it is */ }
+        }
+        const seen = Math.max(r.updatedAt, known?.updatedAt ?? -1)
+        void write(key, { kind, ref, json: '', updatedAt: Math.max(Date.now(), seen + 1), deleted: true }, seen)
+        continue
+      }
       const d = decide(kind, l?.json, r, m.known[key])
       // The version the cloud should have now: the newest we've seen or written.
       const seen = Math.max(r?.updatedAt ?? -1, m.known[key]?.updatedAt ?? -1)
@@ -684,6 +718,12 @@ export const useCloud = createGlobalState(() => {
   // Photos still waiting to back up count as changes that haven't reached the account (also offline).
   if (stored.value) void countWaiting()
 
+  /**
+   * Firebase itself, loaded if need be (the social layer's Firestore backend, and public pages that read a link
+   * signed out). Null when it can't load.
+   */
+  const firebase = () => load()
+
   /** Tests only (emulator builds): sign in as a made-up Google account. */
   async function testSignIn(sub: string, email: string) {
     enabled.value = true
@@ -698,7 +738,7 @@ export const useCloud = createGlobalState(() => {
 
   return {
     enabled, status, user, account, signedIn, pending, message, lastSynced, photoEpoch, photosWaiting, photoBackup, online,
-    prepare, start, signIn, signOut, forget, backupPhotos, photoAdded, photoRemoved, fetchPhoto,
+    prepare, start, signIn, signOut, forget, backupPhotos, photoAdded, photoRemoved, fetchPhoto, firebase,
     ...(emulators ? { testSignIn, testPeek, testPoke, testFirebase } : {}),
   }
 })

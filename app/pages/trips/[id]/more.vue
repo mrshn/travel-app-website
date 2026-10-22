@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { directionsUrl } from '#shared/utils/geo'
+import { fmtDate } from '#shared/utils/time'
 
 /** The More hub (spec 4.6): your trip at a glance, then everything else in three groups. */
 const v = useTripView()
 const trip = v.trip
 const s = v.summary
 const game = useGame()
+const tg = useTripGroup()
 const notesStore = useNotes()
 notesStore.load()
 const noteCount = computed(() => notesStore.notes.value.filter(n => n.trip === v.id.value).length)
@@ -22,7 +24,7 @@ const strip = computed(() => {
   return [...list.filter(b => b.earned), ...list.filter(b => !b.earned)].slice(0, 6)
 })
 
-interface Row { to: string, icon: string, title: string, sub: string, tone: string }
+interface Row { to: string, query?: Record<string, string>, icon: string, title: string, sub: string, tone: string }
 interface Group { key: string, title: string, rows: Row[] }
 
 const groups = computed<Group[]>(() => {
@@ -46,6 +48,37 @@ const groups = computed<Group[]>(() => {
       { to: 'notes', icon: 'book', title: 'Notes & chats', sub: noteCount.value ? `${noteCount.value} saved from chats` : 'Research and chats saved from Claude', tone: 'var(--accent)' },
     ],
   }
+  // Together (docs/design/2026-10-14-together.md, T14): the group, sharing, meeting people.
+  const people = tg.members.value.length
+  const unread = tg.unread.value
+  const together: Group = {
+    key: 'together',
+    title: 'Together',
+    rows: [
+      tg.isGroup.value
+        ? { to: 'group', icon: 'users', title: 'Group chat', sub: [`${people} ${people === 1 ? 'person' : 'people'}`, unread ? `${unread} new` : ''].filter(Boolean).join(' · '), tone: 'var(--accent)' }
+        : { to: 'group', icon: 'userplus', title: 'Plan with friends', sub: 'Invite people, vote on options, chat', tone: 'var(--accent)' },
+      { to: '', query: { share: '1' }, icon: 'share', title: 'Share this plan', sub: 'A link anyone can open, or follow along', tone: 'var(--c-move)' },
+      { to: 'meet', icon: 'hand', title: 'Meet people', sub: 'Tonight, meetups and people you met', tone: 'var(--c-night)' },
+    ],
+  }
+  // If plans change: re-planning in a minute, and money back.
+  const claims = Object.values(v.progress.value.claims ?? {}).filter(c => !c.deleted && c.status !== 'closed' && c.status !== 'paid')
+  const next = claims.filter(c => c.deadline && !c.sentOn).sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0]
+  const change: Group = {
+    key: 'change',
+    title: 'If plans change',
+    rows: [
+      { to: '', query: { changed: '1' }, icon: 'lifebuoy', title: 'Plans changed', sub: 'Running late, starting later, a cancelled flight', tone: 'var(--warn)' },
+      {
+        to: 'claims',
+        icon: 'doc',
+        title: 'Claims',
+        sub: claims.length ? [`${claims.length} open`, next ? `send by ${fmtDate(next.deadline!, 'dayMonth')}` : ''].filter(Boolean).join(' · ') : 'Money back for a cancelled flight or a lost bag',
+        tone: 'var(--gold-ink)',
+      },
+    ],
+  }
   const help: Group = {
     key: 'help',
     title: 'Help and settings',
@@ -55,7 +88,7 @@ const groups = computed<Group[]>(() => {
     ],
   }
   // On the trip and after it, finding your way matters more than getting ready.
-  return v.moment.value && v.moment.value.phase !== 'before' ? [way, ready, help] : [ready, way, help]
+  return v.moment.value && v.moment.value.phase !== 'before' ? [together, way, ready, change, help] : [together, ready, way, change, help]
 })
 </script>
 
@@ -105,7 +138,7 @@ const groups = computed<Group[]>(() => {
         {{ g.title }}
       </h2>
       <div class="card rows">
-        <NuxtLink v-for="r in g.rows" :key="r.to" :to="`/trips/${trip.id}/${r.to}`" class="row-item mrow">
+        <NuxtLink v-for="r in g.rows" :key="r.title" :to="r.query ? { query: r.query } : `/trips/${trip.id}/${r.to}`" class="row-item mrow">
           <span class="ic" :style="{ color: r.tone }"><AppIcon :name="r.icon" /></span>
           <span class="grow tx">
             <b>{{ r.title }}</b>

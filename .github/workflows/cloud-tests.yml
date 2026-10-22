@@ -1,10 +1,10 @@
 name: Cloud sync tests
 
-# Sign-in, sync between two "devices", photo backup and the security rules,
-# against the Firebase emulators (nothing touches the real project).
+# Sign-in, sync between two "devices", photo backup and the security rules, then the social layer (friends, the
+# feed, group trips, meetups, plan links and their rules), against the Firebase emulators (nothing touches the real
+# project). Runs on pushes to any branch that touch the app or the rules.
 on:
   push:
-    branches: [main]
     paths:
       - 'app/**'
       - 'shared/**'
@@ -21,7 +21,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
 
@@ -48,6 +48,11 @@ jobs:
 
       - name: Run the sync tests
         run: npx -y firebase-tools@15 emulators:exec --only auth,firestore,storage --project demo-travels "node tests/e2e/cloud.e2e.mjs"
+
+      # Runs even when the sync tests failed, so one run reports both.
+      - name: Run the social layer tests
+        if: ${{ !cancelled() }}
+        run: npx -y firebase-tools@15 emulators:exec --only auth,firestore,storage --project demo-travels "node tests/e2e/social-cloud.e2e.mjs"
 
       - name: Show what the emulators said
         if: failure()

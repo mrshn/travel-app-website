@@ -16,7 +16,7 @@ const tabs = [
   { key: 'more', label: 'More', icon: 'grid' },
 ]
 /** Sections that live under More. */
-const UNDER_MORE = new Set(['more', 'progress', 'badges', 'bookings', 'packing', 'guide', 'notes', 'sos', 'settings'])
+const UNDER_MORE = new Set(['more', 'progress', 'badges', 'bookings', 'packing', 'guide', 'notes', 'sos', 'settings', 'group', 'meet', 'claims'])
 const section = computed(() => String(route.path.split('/')[3] || 'now'))
 /** The lit tab (spec 3.2): the map lights Plan, or Places when opened from a place; More's sections light More. */
 const activeTab = computed(() => {
@@ -56,8 +56,12 @@ const status = computed(() => {
 })
 const live = computed(() => v.moment.value?.phase === 'during')
 
-// A newer version of this trip arrived from GitHub while you had your own changes here.
-const pending = computed(() => (trip.value ? v.trips.updateFor(trip.value.id) : undefined))
+// A newer version of this trip arrived from GitHub while you had your own changes here (never for a group trip: it
+// left its seed when it was shared).
+const pending = computed(() => (trip.value && !trip.value.group ? v.trips.updateFor(trip.value.id) : undefined))
+// A group trip's votes, who's in and statuses stay live while any of its screens is open. (Not useTripGroup(): this
+// component provides the trip view, so it can't inject it.)
+useGroups().useLive(computed(() => trip.value?.group?.id ?? null))
 function takeUpdate() {
   if (trip.value && v.trips.applyUpdate(trip.value.id)) toast('Plan updated. Your ticks, notes and own stops are kept.', { tone: 'ok' })
 }
@@ -134,6 +138,7 @@ useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` :
         </nav>
         <span class="grow" />
         <span v-if="!online" class="chip t-warn offline" title="Your plan, map pins and notes still work offline"><AppIcon name="signal-off" /><span class="off-t">Offline</span></span>
+        <TogetherButton />
         <NuxtLink v-if="trip.sos?.length" :to="`/trips/${trip.id}/sos`" class="sosbtn hit" aria-label="Emergency numbers">
           <AppIcon name="phone" size="xs" />SOS
         </NuxtLink>
@@ -172,7 +177,13 @@ useHead({ title: computed(() => (trip.value ? `${trip.value.title} · Travels` :
     <StopSheet />
     <PlaceSheet />
     <StopEditor />
+    <ClaimSheet />
     <CostSheet />
+    <ShareSheet />
+    <InviteSheet />
+    <MeetupSheet />
+    <MetSheet />
+    <PlansChangedSheet />
     <GameHost />
   </div>
   <div v-else class="page">

@@ -1,3 +1,5 @@
+import type { Role } from './social'
+
 /** Light of the moment a picture is drawn for. */
 export type Tod = 'dawn' | 'day' | 'golden' | 'sunset' | 'blue' | 'night'
 
@@ -83,6 +85,11 @@ export interface Stop {
   custom?: boolean
   /** This stop is that saved place (PlaceCard.id): it stamps the place when done and puts it "in your plan". */
   placeId?: string
+  /**
+   * When this stop was last added, changed or moved in the app (ISO). Two versions of a shared plan keep the newer
+   * stop (mergeTrips); a stop without it (from the trip's data) loses to any change.
+   */
+  updatedAt?: string
 }
 
 export interface DayAlert {
@@ -261,6 +268,10 @@ export interface Trip {
   sosSteps?: string[]
   driverCard?: string[]
   phrases?: [string, string, string][]
+  /** Lines in the local language for meeting people, [what to say, say it like, what it means]: Meet people's Say hi. */
+  meetPhrases?: [string, string, string][]
+  /** The local language for speech ("it-IT"); without it, the country's main language (shared/utils/talk.ts). */
+  lang?: string
   budget?: BudgetDay[]
   overlay?: { lines: MetroLine[] }
   variant?: TripVariantSwitch
@@ -272,8 +283,39 @@ export interface Trip {
   seedVersion?: string
   /** You changed the plan in the app (so a newer seed is offered, not applied silently). */
   edited?: boolean
+  /**
+   * A group trip (planned with others): its id in the cloud (trips/{id}) and your role in it. Kept on your devices
+   * only: the shared plan never holds it (groupTripJson).
+   */
+  group?: { id: string, role: Role }
+  /**
+   * What was deleted from the plan and when (ISO), so a merge with an older version can't bring it back:
+   * "stop:<id>", "booking:<id>", "packing:<item>".
+   */
+  tombstones?: Record<string, string>
+  /** Copied from a plan someone shared (/p/<id>). */
+  copiedFrom?: { share: string, ownerName: string, title: string }
+  /** Ways to meet people on this trip (the Meet people page). Optional: general ideas show without it. */
+  meet?: MeetIdea[]
   createdAt: string
   updatedAt: string
+}
+
+/** One way to meet people on a trip: an event, a tour, an app or a tip. */
+export interface MeetIdea {
+  id: string
+  kind: 'event' | 'tour' | 'app' | 'place' | 'tip'
+  title: string
+  /** One or two sentences. Inline Markdown (bold, links) is fine. */
+  text: string
+  icon?: string
+  /** When it happens, as shown ("Nightly from 21:30", "Fri 9 Oct, 10:00 and 11:00"). */
+  when?: string
+  /** The trip day it belongs to, if any (Tonight shows the ideas of today). */
+  dayId?: string
+  link?: LinkRef
+  /** A ready line to post as a meetup ("Anyone for the pub crawl tonight?"). */
+  ask?: string
 }
 
 /* ---------- progress (what you did) ---------- */
@@ -329,6 +371,8 @@ export interface Expense {
   bookingId?: string
   /** Title of the linked stop or booking when it was logged, so it still reads well if that goes away. */
   title?: string
+  /** Part of a claim (Claim.id): money you want back. */
+  claimId?: string
   /** Logged while previewing another moment of the trip. */
   preview?: true
   /** When it was logged (ISO, real clock). */
@@ -361,4 +405,88 @@ export interface TripProgress {
   expenses?: Record<string, Expense>
   /** Stamps you gave or took back by hand, by place id (older saves lack it). Stamps from done stops are derived. */
   stamps?: Record<string, PlaceStamp>
+  /** Claims for money back (a cancelled flight, a lost bag), by id, tombstones included. */
+  claims?: Record<string, Claim>
+  /** People you met on the trip, by id, tombstones included. */
+  people?: Record<string, MetPerson>
+  /**
+   * Say hi's count (Meet people) by day id. Kept apart from the day's note, each day with its own updatedAt, so a
+   * + tapped on one phone can't overwrite a journal written on another.
+   */
+  talks?: Record<string, DayTalk>
+}
+
+/** How many people you said hi to on a day: 0 to 99. */
+export interface DayTalk {
+  n: number
+  updatedAt: string
+}
+
+export type ClaimKind = 'flight-cancelled' | 'flight-delayed' | 'bag' | 'booking' | 'other'
+export type ClaimStatus = 'draft' | 'sent' | 'waiting' | 'escalated' | 'paid' | 'partly' | 'rejected' | 'closed'
+/** How likely a line of a claim is to be paid. */
+export type ClaimOdds = 'sure' | 'likely' | 'unsure'
+
+export interface ClaimLine {
+  id: string
+  label: string
+  amount: number
+  currency: string
+  odds?: ClaimOdds
+  /** What was paid back for this line, once it was. */
+  paid?: number
+}
+
+export interface ClaimStep {
+  id: string
+  text: string
+  done?: boolean
+  /** YYYY-MM-DD */
+  due?: string
+}
+
+/** Money you want back, and the steps to get it. Kept in the trip's progress: private to you. */
+export interface Claim {
+  id: string
+  kind: ClaimKind
+  title: string
+  /** Who you claim from (an airline, a hotel). */
+  company?: string
+  /** Your booking reference with them. */
+  reference?: string
+  /** The reference they gave your claim, once sent. */
+  claimRef?: string
+  /** YYYY-MM-DD the thing happened. */
+  incident?: string
+  /** YYYY-MM-DD the claim must be sent by. */
+  deadline?: string
+  /** YYYY-MM-DD it was sent. */
+  sentOn?: string
+  status: ClaimStatus
+  lines: ClaimLine[]
+  steps: ClaimStep[]
+  note?: string
+  links?: LinkRef[]
+  at: string
+  updatedAt: string
+  deleted?: true
+}
+
+/** Someone you met on the trip. Kept in the trip's progress: private to you. */
+export interface MetPerson {
+  id: string
+  name: string
+  /** Instagram or another handle ("@ana.travels"). */
+  handle?: string
+  /** A phone number or another way to reach them. */
+  contact?: string
+  /** Where you met ("Hostel bar", "Pub crawl"). */
+  where?: string
+  dayId?: string
+  note?: string
+  /** They're your friend in the app now. */
+  friendUid?: string
+  at: string
+  updatedAt: string
+  deleted?: true
 }

@@ -289,6 +289,9 @@ const s = v.summary
             </button>
           </div>
 
+          <!-- A group trip: where everyone is, and the chat -->
+          <NowGroupStrip />
+
           <!-- The one thing to do now -->
           <section v-if="guide && (guide.mode === 'at' || guide.mode === 'go' || guide.mode === 'free') && focus" class="hero card" :class="`mode-${guide.mode} u-${guide.urgency ?? 'relaxed'}`">
             <div class="pic art-frame">
@@ -390,7 +393,7 @@ const s = v.summary
             <AppIcon name="calendar" />
             <h3>Nothing planned today</h3>
             <p>Add a few stops and the guide will walk you through them.</p>
-            <p style="margin-top: 12px">
+            <p v-if="v.canEdit.value" style="margin-top: 12px">
               <button class="btn primary" type="button" @click="editor.open('new')">
                 <AppIcon name="plus" size="sm" />Add a stop
               </button>
@@ -421,6 +424,9 @@ const s = v.summary
 
           <!-- Late at night: the way home, under the Next card -->
           <HomeCard v-if="lateNight && !homeFirst" :day="day" :you="you" :near="planHere" />
+
+          <!-- Running late, starting later, a cancelled flight -->
+          <PlansChangedLink phase="during" />
 
           <!-- Catch up -->
           <section v-if="guide?.behind.length" class="card catch">
@@ -580,6 +586,9 @@ const s = v.summary
           </div>
         </div>
       </section>
+
+      <!-- Travel day trouble: a cancelled or delayed flight -->
+      <PlansChangedLink phase="before" />
 
       <div class="cols">
         <div class="main">

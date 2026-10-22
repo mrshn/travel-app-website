@@ -12,6 +12,9 @@ const props = defineProps<{
 const emit = defineEmits<{ open: [], toggle: [e: MouseEvent] }>()
 const done = computed(() => props.state === 'done')
 const tags = computed(() => props.stop.tags ?? [])
+// A group trip: who's in for this stop (docs/design/2026-10-14-together.md, 5.4). Nothing at all on a solo trip.
+const tg = useTripGroup()
+const going = computed(() => (tg.isGroup.value && !props.stop.minor ? tg.goingFor(props.stop.id).in.map(uid => tg.member(uid)) : []))
 </script>
 
 <template>
@@ -36,6 +39,7 @@ const tags = computed(() => props.stop.tags ?? [])
         <span v-if="feedback?.photos?.length" class="chip"><AppIcon name="camera" />{{ feedback.photos.length }}</span>
         <span v-if="feedback?.note" class="chip" title="Has a note"><AppIcon name="chat" /></span>
         <span v-if="stop.custom" class="chip t-plain">Added by you</span>
+        <AvatarStack v-if="going.length" class="going" :people="going" :max="3" :size="22" label="In" />
       </span>
     </button>
     <button

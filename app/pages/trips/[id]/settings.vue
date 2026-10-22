@@ -85,7 +85,28 @@ function removeTrip() {
       </div>
     </section>
 
-    <TripForm :trip="trip" submit-label="Save changes" @submit="save" />
+    <TripForm v-if="v.canEdit.value" :trip="trip" submit-label="Save changes" @submit="save" />
+    <section v-else class="card pad stack">
+      <h2 class="h3">
+        {{ trip.title }} · {{ fmtRange(trip.start, trip.end) }}
+      </h2>
+      <p class="small muted">
+        You can view this trip. Its name, dates and where everyone stays are the organiser's to change.
+      </p>
+    </section>
+    <section v-if="trip.group" class="card pad stack together">
+      <h2 class="h3">
+        A group trip
+      </h2>
+      <p class="small muted">
+        Everyone in it sees this plan. Your ticks, ratings, notes, photos, costs and stamps stay yours.
+      </p>
+      <div class="row wrap">
+        <NuxtLink class="btn" :to="`/trips/${trip.id}/group?tab=people`">
+          <AppIcon name="users" size="sm" />People and roles
+        </NuxtLink>
+      </div>
+    </section>
 
     <section class="card pad stack data">
       <h2 class="h3">
@@ -110,9 +131,12 @@ function removeTrip() {
         <button class="btn danger" type="button" @click="clearProgress">
           <AppIcon name="undo" size="sm" />Clear my progress
         </button>
-        <button class="btn danger" type="button" @click="removeTrip">
+        <button v-if="!trip.group" class="btn danger" type="button" @click="removeTrip">
           <AppIcon name="trash" size="sm" />Delete trip
         </button>
+        <NuxtLink v-else class="btn danger" :to="`/trips/${trip.id}/group?tab=people`">
+          <AppIcon name="logout" size="sm" />{{ trip.group.role === 'owner' ? 'Stop sharing' : 'Leave this trip' }}
+        </NuxtLink>
       </div>
     </section>
   </div>
@@ -123,4 +147,5 @@ function removeTrip() {
 .ttl { margin-bottom: 14px; }
 .variant { margin-bottom: 14px; }
 .data { margin-top: 14px; }
+.together { margin-top: 14px; }
 </style>

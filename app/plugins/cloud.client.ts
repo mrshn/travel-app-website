@@ -1,5 +1,7 @@
+import { socialPublicPath } from '#shared/utils/social'
+
 // Keeps the app on one address, reconnects your Google account when the app opens, and keeps a device with no
-// account on the landing page.
+// account on the landing page (links meant for anyone, /f/ /j/ /m/ /p/, stay where they are).
 export default defineNuxtPlugin(() => {
   const config = useAppConfig()
   // Firebase Hosting answers on two addresses; your data is stored per address, so use one.
@@ -14,12 +16,20 @@ export default defineNuxtPlugin(() => {
   // Opening a route is checked by middleware/auth.global.ts.
   const router = useRouter()
   watch(() => !cloud.account.value && !cloud.signedIn.value, (out) => {
-    if (out && router.currentRoute.value.path !== '/') void router.replace('/')
+    const path = router.currentRoute.value.path
+    if (out && path !== '/' && !socialPublicPath(path)) void router.replace('/')
   })
 
-  // Emulator builds (tests) expose the stores so a test can drive two "devices".
-  if (useRuntimeConfig().public.firebaseEmulators) {
+  // Emulator builds and memory builds (tests) expose the stores so a test can drive two "devices" or act for others.
+  const pub = useRuntimeConfig().public
+  if (pub.firebaseEmulators || pub.socialBackend === 'memory') {
     const trips = useTrips()
-    Object.assign(window, { __travelsTest: { cloud, trips: trips.trips, addSample: trips.addSample, progress: useProgressStore(), photos: usePhotos() } })
+    Object.assign(window, {
+      __travelsTest: {
+        cloud, trips: trips.trips, addSample: trips.addSample, progress: useProgressStore(), photos: usePhotos(),
+        // The social layer (docs/design/2026-10-14-together.md): its backend for whoever is signed in, and the group engine.
+        social: useSocial(), groups: useGroups(),
+      },
+    })
   }
 })

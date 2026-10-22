@@ -123,6 +123,8 @@ const emit = defineEmits<{ close: [] }>()
 
 const panel = ref<HTMLElement | null>(null)
 const drag = ref(0)
+/** The sheet opened last is on top, whichever was mounted first (a post composer over a stop sheet). */
+const layer = ref(2000)
 let startY = 0
 let dragging = false
 let opener: HTMLElement | null = null
@@ -166,6 +168,7 @@ watch(() => props.open, async (v) => {
     if (openSheets.includes(self)) return
     opener = findOpener()
     register(self)
+    layer.value = 2000 + openSheets.length
     await nextTick()
     // Still open (it may have closed again in the same moment).
     if (openSheets.includes(self)) focusPanel()
@@ -230,6 +233,8 @@ function trapTab(e: KeyboardEvent) {
 
 function down(e: PointerEvent) {
   if (window.matchMedia('(min-width: 900px)').matches) return
+  // A button in the strip (the ×) keeps its click: capturing the pointer would send the click to the strip.
+  if ((e.target as Element | null)?.closest?.('button, a, input, select, textarea')) return
   dragging = true
   startY = e.clientY
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -249,7 +254,7 @@ function up() {
 <template>
   <Teleport to="body">
     <Transition name="sheet">
-      <div v-if="open" class="sheet-wrap" @click.self="emit('close')" @keydown="onKey">
+      <div v-if="open" class="sheet-wrap" :style="{ zIndex: layer }" @click.self="emit('close')" @keydown="onKey">
         <div
           ref="panel"
           class="sheet"

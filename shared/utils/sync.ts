@@ -47,7 +47,12 @@ const newer = (a?: string, b?: string) => timeOf(a) >= timeOf(b)
 const own = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key)
 
 /** Top-level progress fields this version knows; any other field is kept as it is. */
-const PROGRESS_FIELDS = new Set(['stops', 'feedback', 'choices', 'bookings', 'packing', 'variant', 'dayNotes', 'tripNote', 'expenses', 'stamps'])
+const PROGRESS_FIELDS = new Set(['stops', 'feedback', 'choices', 'bookings', 'packing', 'variant', 'dayNotes', 'tripNote', 'expenses', 'stamps', 'claims', 'people', 'talks'])
+
+/** Progress maps kept record by record (each record with its own updatedAt; a deletion is a tombstone). */
+const RECORD_MAPS = ['expenses', 'stamps', 'claims', 'people', 'talks'] as const
+/** Record maps an older save may lack: left out while neither side has one. */
+const OPTIONAL_MAPS = new Set<string>(['claims', 'people', 'talks'])
 
 function recordsOf<T>(m: unknown): Record<string, T> {
   return m && typeof m === 'object' && !Array.isArray(m) ? m as Record<string, T> : {}
@@ -89,8 +94,9 @@ function pickRecord<T extends { updatedAt: string }>(x: T, y: T): T {
 
 /**
  * Two versions of the same progress that grew apart (e.g. used on two devices before signing in).
- * Keeps everything from both; where both have the same thing, the newer one wins. Costs and stamps merge
- * record by record (mergeRecords); top-level fields this version doesn't know are kept, b's winning.
+ * Keeps everything from both; where both have the same thing, the newer one wins. Costs, stamps, claims, people and
+ * Say hi's counts merge record by record (mergeRecords); top-level fields this version doesn't know are kept, b's
+ * winning.
  */
 export function mergeProgress(a: TripProgress, b: TripProgress): TripProgress {
   const out = emptyProgress()
@@ -126,6 +132,13 @@ export function mergeProgress(a: TripProgress, b: TripProgress): TripProgress {
   if (note) out.tripNote = note
   out.expenses = mergeRecords(a.expenses, b.expenses)
   out.stamps = mergeRecords(a.stamps, b.stamps)
+  // Claims and people only when either side has some (older saves lack them, and an empty map changes nothing).
+  const claims = mergeRecords(a.claims, b.claims)
+  if (Object.keys(claims).length) out.claims = claims
+  const people = mergeRecords(a.people, b.people)
+  if (Object.keys(people).length) out.people = people
+  const talks = mergeRecords(a.talks, b.talks)
+  if (Object.keys(talks).length) out.talks = talks
   // Fields from a newer app version survive a merge made by this one.
   const extra = out as unknown as Record<string, unknown>
   for (const src of [a, b]) {
@@ -150,7 +163,7 @@ export function isPristine(kind: ItemKind, json: string): boolean {
   const p = JSON.parse(json) as TripProgress
   const n = (o?: object) => Object.keys(o ?? {}).length
   return !n(p.stops) && !n(p.feedback) && !n(p.dayNotes) && !n(p.bookings) && !n(p.packing) && !n(p.choices) && !p.tripNote
-    && !n(p.expenses) && !n(p.stamps) && !p.variant
+    && !n(p.expenses) && !n(p.stamps) && !n(p.claims) && !n(p.people) && !n(p.talks) && !p.variant
 }
 
 /**
@@ -163,9 +176,9 @@ function addedAfter(kind: ItemKind, json: string, at: number): boolean {
 }
 
 /**
- * A newer cloud copy with this device's costs and stamps merged back in (mergeRecords), when taking it as it is
- * would lose some: it lacks one of them, or holds an older version of one (so an edit, a deletion or a stamp
- * taken back would be undone). Else undefined. Everything else comes from the newer copy, as when applying it.
+ * A newer cloud copy with this device's costs, stamps, claims and people merged back in (mergeRecords), when taking
+ * it as it is would lose some: it lacks one of them, or holds an older version of one (so an edit, a deletion or a
+ * stamp taken back would be undone). Else undefined. Everything else comes from the newer copy, as when applying it.
  *
  * Records are never removed while a trip's progress exists (a deletion is a tombstone, a stamp taken back is
  * `on: false` or `null`), so such a copy lost them on its way: an older app version's merge drops both maps,
@@ -177,14 +190,20 @@ function keepRecords(local: string, remote: string): string | undefined {
     const l = JSON.parse(local) as unknown
     const r = JSON.parse(remote) as unknown
     if (!isRecord(l) || !isRecord(r)) return undefined
-    const mine = l as Partial<TripProgress>
-    const theirs = r as Partial<TripProgress>
-    const expenses = mergeRecords(mine.expenses, theirs.expenses)
-    const stamps = mergeRecords(mine.stamps, theirs.stamps)
+    const mine = l as Record<string, Record<string, { updatedAt: string }> | undefined>
+    const theirs = r as Record<string, Record<string, { updatedAt: string }> | undefined>
     // mergeRecords of their map alone is that map tidied (ids sorted, non-records left out).
     const same = (merged: object, map?: Record<string, { updatedAt: string }>) => JSON.stringify(merged) === JSON.stringify(mergeRecords(map))
-    if (same(expenses, theirs.expenses) && same(stamps, theirs.stamps)) return undefined
-    return JSON.stringify({ ...theirs, expenses, stamps })
+    const out: Record<string, unknown> = { ...theirs }
+    let changed = false
+    for (const key of RECORD_MAPS) {
+      const merged = mergeRecords(mine[key], theirs[key])
+      // Claims, people and counts are left out while neither side has one (expenses and stamps always come back).
+      if (OPTIONAL_MAPS.has(key) && !Object.keys(merged).length && theirs[key] === undefined) continue
+      out[key] = merged
+      if (!same(merged, theirs[key])) changed = true
+    }
+    return changed ? JSON.stringify(out) : undefined
   }
   catch {
     return undefined

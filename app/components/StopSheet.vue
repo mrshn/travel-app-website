@@ -130,6 +130,8 @@ function edit() {
           </NuxtLink>
         </div>
 
+        <StopTogether :stop="stop" />
+
         <section class="here" aria-labelledby="stop-costs-h">
           <div class="here-h">
             <h3 id="stop-costs-h" class="h3">
@@ -223,7 +225,9 @@ function edit() {
         <FeedbackEditor :stop-id="stop.id" />
         <hr class="divider">
 
-        <div class="row wrap">
+        <StopShare :stop="stop" />
+
+        <div v-if="v.canEdit.value" class="row wrap">
           <button class="btn ghost sm" type="button" @click="edit">
             <AppIcon name="edit" size="sm" />Edit stop
           </button>

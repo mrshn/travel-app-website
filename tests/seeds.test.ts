@@ -92,6 +92,30 @@ describe.each(SEED_TRIPS.map(t => [t.id, t] as const))('trip %s', (_id, t) => {
     }
   })
 
+  it('lists ways to meet people with unique ids, known kinds, days that exist and a line to ask with', () => {
+    const ideas = t.meet ?? []
+    const ids = ideas.map(m => m.id)
+    expect(new Set(ids).size, 'duplicate meet idea id').toBe(ids.length)
+    const days = new Set(t.days.map(d => d.id))
+    for (const m of ideas) {
+      expect(m.id, 'meet idea id').toMatch(/^[a-z0-9][a-z0-9-]*$/)
+      // General ideas for any city use ids starting "any-" (MeetIdea.vue): a trip's own never take one.
+      expect(m.id.startsWith('any-'), `${m.id}: "any-" is kept for general ideas`).toBe(false)
+      expect(['event', 'tour', 'app', 'place', 'tip'], `${m.id} kind`).toContain(m.kind)
+      expect(m.title.trim().length, `${m.id} title`).toBeGreaterThan(0)
+      // A meetup made from an idea takes its title (at most 80 characters) and its ask as the note (at most 280).
+      expect(m.title.length, `${m.id} title`).toBeLessThanOrEqual(80)
+      expect(m.text.trim().length, `${m.id} text`).toBeGreaterThan(0)
+      if (m.dayId !== undefined) expect(days.has(m.dayId), `${m.id} dayId ${m.dayId}`).toBe(true)
+      if (m.ask !== undefined) expect(m.ask.trim().length && m.ask.length <= 280, `${m.id} ask`).toBeTruthy()
+      if (m.link) {
+        expect(m.link.label.trim().length, `${m.id} link label`).toBeGreaterThan(0)
+        expect(m.link.url, `${m.id} link`).toMatch(/^https:\/\//)
+      }
+      expect(`${m.title} ${m.text} ${m.when ?? ''} ${m.ask ?? ''}`, `${m.id}: no em dash`).not.toMatch(/\u2014/)
+    }
+  })
+
   it('links stops and options only to places that exist', () => {
     const ids = new Set((t.places ?? []).map(p => p.id))
     for (const { where, stops } of allStopLists(t)) {

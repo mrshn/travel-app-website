@@ -27,6 +27,9 @@ const accountLabel = computed(() => {
   const s = ({ 'synced': 'synced', 'syncing': 'syncing', 'offline': 'offline', 'error': 'not syncing', 'starting': 'connecting', 'signed-out': 'signed out' } as Record<string, string>)[cloud.status.value]
   return s ? `Account: ${s}` : 'Account'
 })
+// Friends (docs/design/2026-10-14-together.md, 5.8): a dot for friend requests and unread activity.
+const social = useSocial()
+const friendsLabel = computed(() => (social.badge.value ? `Friends, ${social.badge.value} new` : 'Friends'))
 const notesStore = useNotes()
 // The notes load for the signed-in home only (the landing page needs none of them), and list only those of the
 // account's trips and of no trip (D43).
@@ -118,6 +121,10 @@ useHead({ title: 'Travels' })
         <button class="btn icon plain round" type="button" :aria-label="`Theme: ${choice}`" @click="cycleTheme">
           <AppIcon :name="themeIcon" />
         </button>
+        <NuxtLink to="/friends" class="btn icon plain round friends" :aria-label="friendsLabel">
+          <AppIcon name="users" />
+          <i v-if="social.badge.value" class="dot" />
+        </NuxtLink>
         <NuxtLink v-if="me" to="/settings#account" class="btn icon plain round acct" :aria-label="accountLabel">
           <img v-if="me.photo" :src="me.photo" alt="" referrerpolicy="no-referrer">
           <AppIcon v-else name="person" />
@@ -169,6 +176,8 @@ useHead({ title: 'Travels' })
       </div>
     </NuxtLink>
 
+    <HomeDeadlines />
+
     <div v-if="totals.trips" class="stats card">
       <div><b class="num">{{ totals.trips }}</b><span>{{ totals.trips === 1 ? 'trip' : 'trips' }}</span></div>
       <div><b class="num">{{ totals.days }}</b><span>days</span></div>
@@ -176,6 +185,8 @@ useHead({ title: 'Travels' })
       <div><b class="num">{{ totals.avg ? totals.avg.toFixed(1) : '–' }}</b><span>avg rating</span></div>
       <div><b class="num">{{ totals.photos }}</b><span>photos</span></div>
     </div>
+
+    <HomeFriends />
 
     <section v-if="upcoming.length">
       <div class="sec-h">
@@ -263,21 +274,24 @@ useHead({ title: 'Travels' })
 .acct .dot.warn { background: var(--warn); }
 .acct .dot.bad { background: var(--bad); }
 .acct .dot.busy { background: var(--gold); }
+.friends { position: relative; }
+.friends .dot { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 999px; border: 2px solid var(--bg); background: var(--accent); }
 .again { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0 4px; border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
 .again-i { color: var(--warn); flex: none; margin-top: 2px; }
 .again-who b { overflow-wrap: anywhere; }
 .msg { padding: 8px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .msg:empty { display: none; }
 .grow1 { flex: 1; min-width: 0; }
-/* Four buttons on every signed-in phone: they keep 44 px, the logo stays whole, and the word gives way first. */
+/* Five buttons on every signed-in phone: they keep 44 px, the logo stays whole, and the word gives way first. The
+   word needs about 160 px beside them (145 px set tighter), so it shows from 440 px (425 px, tighter). */
 .home-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(4px + var(--safe-t)) 0 8px; }
 .home-top .row { flex: none; gap: 4px; }
 .home-top .row > * { flex: none; }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 44px; min-height: 44px; text-decoration: none; color: var(--accent); }
 .brand :deep(.logo) { flex: none; }
 .brand b { font-size: 19px; letter-spacing: .24em; text-transform: uppercase; }
-@media (max-width: 389px) { .brand b { letter-spacing: .14em; } }
-@media (max-width: 374px) { .brand b { display: none; } }
+@media (max-width: 439px) { .brand b { letter-spacing: .14em; } }
+@media (max-width: 424px) { .brand b { display: none; } }
 .hello { margin: 18px 0 16px; }
 .hello .h1 { margin-top: 4px; }
 .livecard { display: flex; align-items: flex-end; min-height: 260px; overflow: hidden; margin-bottom: 16px; }
@@ -290,6 +304,8 @@ useHead({ title: 'Travels' })
 .stats div + div { border-left: 1px solid var(--line); }
 .stats b { font-size: 21px; font-weight: 600; }
 .stats span { font-size: 11.5px; color: var(--fg-3); font-weight: 600; line-height: 1.2; }
+/* A section's "All 3" link: a 44 px target without moving the heading. */
+.sec-h a.aside { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px; margin: -12px 0; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .notes { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 @media (max-width: 480px) { .notes { grid-template-columns: minmax(0, 1fr); } }

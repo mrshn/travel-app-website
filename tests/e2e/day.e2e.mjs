@@ -457,11 +457,11 @@ try {
   {
     const { ctx, page, errors } = await scenario({ at: FRI_2230 })
     await shot(page, 'now-fri-2230')
-    await check('L2 at Fri 22:30 Now shows "Getting back to YellowSquare" with its three actions, under the hero', async () => {
+    await check('L2 at Fri 22:30 Now shows "Getting back to Your hostel" with its three actions, under the hero', async () => {
       const hc = page.locator('.hc')
       await hc.waitFor()
       const text = flat(await hc.innerText())
-      for (const s of ['Late night', 'Getting back to YellowSquare', 'Via Palestro 51, 00185 Roma', 'Last metro ~01:30', 'Take me home', 'Show the driver', 'Call a taxi · 060609']) {
+      for (const s of ['Late night', 'Getting back to Your hostel', 'Castro Pretorio, 00185 Roma (example area)', 'Last metro ~01:30', 'Take me home', 'Show the driver', 'Call a taxi · 060609']) {
         assert(text.toLowerCase().includes(s.toLowerCase()), `missing "${s}" in "${text}"`)
       }
       const order = await page.evaluate(() => {
@@ -579,12 +579,12 @@ try {
         catch {}
       },
     })
-    await check('with a location fix: "3.3 km from you · about 53 min on foot" and transit directions from you', async () => {
+    await check('with a location fix: "3.5 km from you · about 57 min on foot" and transit directions from you', async () => {
       const line = await until('the distance line', async () => {
         const t = flat(await page.locator('.hc').innerText())
         return /from you/.test(t) ? t : ''
       }, 8000)
-      assert(line.includes('3.3 km from you · about 53 min on foot'), line)
+      assert(line.includes('3.5 km from you · about 57 min on foot'), line)
       const home = new URL(await page.locator('.hc').getByRole('link', { name: 'Take me home' }).getAttribute('href'))
       assert(home.searchParams.get('travelmode') === 'transit', `${home}`)
       assert(home.searchParams.get('origin') === '41.8892,12.4697', `${home}`)

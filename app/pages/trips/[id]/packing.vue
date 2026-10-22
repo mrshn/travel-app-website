@@ -40,21 +40,16 @@ function add() {
   const t = item.value.trim()
   const tr = trip.value
   if (!t || !tr) return
-  if (tr.packing.includes(t)) {
+  if (!v.trips.addPacking(tr.id, t)) {
     toast('Already on the list')
     return
   }
-  v.trips.update(tr.id, (x) => {
-    x.packing.push(t)
-  })
   item.value = ''
 }
 function remove(x: string) {
   const tr = trip.value
   if (!tr) return
-  v.trips.update(tr.id, (t) => {
-    t.packing = t.packing.filter(p => p !== x)
-  })
+  v.trips.removePacking(tr.id, x)
   v.togglePacking(x, false)
 }
 function unpackAll() {
@@ -118,14 +113,17 @@ const editing = ref(false)
       </ul>
     </template>
 
-    <form class="row add" @submit.prevent="add">
+    <p v-if="!v.canEdit.value" class="small muted viewer">
+      You can view this trip, so its list stays as the group made it. Your ticks are yours.
+    </p>
+    <form v-if="v.canEdit.value" class="row add" @submit.prevent="add">
       <input v-model="item" class="input grow" placeholder="Add something to pack" aria-label="New packing item">
       <button class="btn primary" type="submit" :disabled="!item.trim()">
         <AppIcon name="plus" size="sm" />Add
       </button>
     </form>
     <div class="row wrap tools">
-      <button class="btn sm ghost" type="button" @click="editing = !editing">
+      <button v-if="v.canEdit.value" class="btn sm ghost" type="button" @click="editing = !editing">
         <AppIcon :name="editing ? 'check' : 'edit'" size="sm" />{{ editing ? 'Done editing' : 'Edit list' }}
       </button>
       <button class="btn sm plain" type="button" @click="unpackAll">
@@ -137,6 +135,7 @@ const editing = ref(false)
 
 <style scoped>
 .packing { padding-top: 18px; max-width: 760px; }
+.viewer { margin-top: 16px; }
 .head { display: flex; align-items: center; gap: 12px; }
 .gbar { margin: 14px 0 16px; }
 .list { list-style: none; overflow: hidden; }

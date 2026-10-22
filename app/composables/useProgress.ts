@@ -1,6 +1,6 @@
 import { createGlobalState, useStorage } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
-import type { DayNote, Expense, Feedback, PlaceStamp, StopStatus, TripProgress } from '#shared/types/trip'
+import type { Claim, DayNote, Expense, Feedback, MetPerson, PlaceStamp, StopStatus, TripProgress } from '#shared/types/trip'
 import { emptyProgress, uid } from '#shared/utils/plan'
 
 export const useProgressStore = createGlobalState(() =>
@@ -90,6 +90,13 @@ export function useProgress(tripId: MaybeRefOrGetter<string>) {
     })
   }
 
+  /** Drops your own pick of an option: the plan's pick (in a group trip, the group's) applies again. */
+  function unchoose(stopId: string) {
+    edit((p) => {
+      delete p.choices[stopId]
+    })
+  }
+
   function toggleBooking(id: string, value?: boolean) {
     edit((p) => {
       const v = value ?? !p.bookings[id]
@@ -115,6 +122,14 @@ export function useProgress(tripId: MaybeRefOrGetter<string>) {
   function setDayNote(dayId: string, patch: Partial<DayNote>) {
     edit((p) => {
       p.dayNotes[dayId] = { ...p.dayNotes[dayId], ...patch, updatedAt: new Date().toISOString() }
+    })
+  }
+
+  /** Say hi's count for a day (0 to 99), saved with its own time (TripProgress.talks). */
+  function setTalk(dayId: string, n: number) {
+    edit((p) => {
+      p.talks ??= {}
+      p.talks[dayId] = { n: Math.min(99, Math.max(0, Math.floor(n) || 0)), updatedAt: new Date().toISOString() }
     })
   }
 
@@ -194,13 +209,61 @@ export function useProgress(tripId: MaybeRefOrGetter<string>) {
     })
   }
 
+  /**
+   * Saves a claim (new or changed), stamped now. Records are merged one by one between devices (sync.ts), so a
+   * claim is always written whole.
+   */
+  function saveClaim(c: Omit<Claim, 'updatedAt' | 'at'> & { at?: string }): Claim {
+    const now = new Date().toISOString()
+    const record = { ...defined(c, 'deleted'), at: c.at || now, updatedAt: now } as Claim
+    edit((p) => {
+      p.claims ??= {}
+      p.claims[record.id] = record
+    })
+    return record
+  }
+
+  /** Deletes a claim (a tombstone, so another device's copy can't bring it back). Returns it as it was. */
+  function removeClaim(id: string): Claim | undefined {
+    let before: Claim | undefined
+    edit((p) => {
+      const cur = p.claims?.[id]
+      if (!cur || cur.deleted) return
+      before = { ...cur }
+      p.claims![id] = { ...cur, deleted: true, updatedAt: new Date().toISOString() }
+    })
+    return before
+  }
+
+  /** Saves someone you met (new or changed), stamped now. */
+  function savePerson(m: Omit<MetPerson, 'updatedAt' | 'at'> & { at?: string }): MetPerson {
+    const now = new Date().toISOString()
+    const record = { ...defined(m, 'deleted'), at: m.at || now, updatedAt: now } as MetPerson
+    edit((p) => {
+      p.people ??= {}
+      p.people[record.id] = record
+    })
+    return record
+  }
+
+  function removePerson(id: string): MetPerson | undefined {
+    let before: MetPerson | undefined
+    edit((p) => {
+      const cur = p.people?.[id]
+      if (!cur || cur.deleted) return
+      before = { ...cur }
+      p.people![id] = { ...cur, deleted: true, updatedAt: new Date().toISOString() }
+    })
+    return before
+  }
+
   function clear() {
     const id = toValue(tripId)
     if (id && copy.value === opened) delete store.value[id]
   }
 
   return {
-    progress, mark, statusOf, setFeedback, choose, toggleBooking, togglePacking, setVariant, setDayNote, setTripNote,
-    addExpense, updateExpense, removeExpense, restoreExpense, setStamp, clear,
+    progress, mark, statusOf, setFeedback, choose, unchoose, toggleBooking, togglePacking, setVariant, setDayNote, setTalk, setTripNote,
+    addExpense, updateExpense, removeExpense, restoreExpense, setStamp, saveClaim, removeClaim, savePerson, removePerson, clear,
   }
 }
