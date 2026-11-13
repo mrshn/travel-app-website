@@ -3,6 +3,7 @@
 // Pushing a newer version of a trip here updates it in the app on every device:
 // silently if it wasn't changed there, otherwise the app offers the update.
 import type { Trip } from '#shared/types/trip'
+import { berlinTrip } from './berlin'
 import { romeTrip } from './rome'
 
-export const SEED_TRIPS: Trip[] = [romeTrip]
+export const SEED_TRIPS: Trip[] = [romeTrip, berlinTrip]
